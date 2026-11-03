@@ -7,6 +7,8 @@ import com.mes.entity.ProductionData;
 import com.mes.mapper.ProductionDataMapper;
 import com.mes.service.ProductionDataService;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,6 +36,7 @@ public class ProductionDataServiceImpl extends ServiceImpl<ProductionDataMapper,
 
     @Override
     @Transactional
+    @CacheEvict(cacheNames = "deviceLatest", allEntries = true)
     public boolean batchInsertData(List<ProductionData> dataList) {
         if (dataList == null || dataList.isEmpty()) {
             return false;
@@ -64,6 +67,7 @@ public class ProductionDataServiceImpl extends ServiceImpl<ProductionDataMapper,
     }
 
     @Override
+    @Cacheable(cacheNames = "deviceLatest", key = "#taskId + ':' + #dataType")
     public ProductionData getLatestData(Long taskId, String dataType) {
         return baseMapper.selectLatestData(taskId, dataType);
     }

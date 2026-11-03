@@ -15,9 +15,11 @@ import com.mes.mapper.ProductionTaskMapper;
 import com.mes.mapper.QualityTaskMapper;
 import com.mes.vo.BatchTraceVO;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
@@ -37,6 +39,7 @@ public class BatchTraceService {
     private final ProductionTaskMapper productionTaskMapper;
     private final InventoryMapper inventoryMapper;
 
+    @Cacheable(cacheNames = "batchTrace", key = "#batchNo")
     public BatchTraceVO traceByBatchNo(String batchNo) {
         BatchTraceVO trace = new BatchTraceVO();
         trace.setBatchNo(batchNo);
@@ -52,7 +55,7 @@ public class BatchTraceService {
                 .map(PickListDetail::getPickListId)
                 .collect(Collectors.toCollection(LinkedHashSet::new));
         List<PickList> pickLists = pickListIds.isEmpty()
-                ? List.of()
+                ? new ArrayList<>()
                 : pickListMapper.selectBatchIds(pickListIds);
         trace.setPickLists(pickLists);
 
@@ -67,7 +70,7 @@ public class BatchTraceService {
                 .forEach(orderCodes::add);
 
         List<ProductionOrder> orders = orderCodes.isEmpty()
-                ? List.of()
+                ? new ArrayList<>()
                 : productionOrderMapper.selectList(new LambdaQueryWrapper<ProductionOrder>()
                         .in(ProductionOrder::getOrderCode, orderCodes));
         trace.setOrders(orders);
@@ -76,7 +79,7 @@ public class BatchTraceService {
                 .map(ProductionOrder::getId)
                 .collect(Collectors.toCollection(LinkedHashSet::new));
         List<ProductionTask> processTasks = orderIds.isEmpty()
-                ? List.of()
+                ? new ArrayList<>()
                 : productionTaskMapper.selectList(new LambdaQueryWrapper<ProductionTask>()
                         .in(ProductionTask::getOrderId, orderIds)
                         .orderByAsc(ProductionTask::getOperationSequence));

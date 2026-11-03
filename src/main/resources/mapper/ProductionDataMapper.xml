@@ -4,7 +4,7 @@
 
     <!-- 批量插入生产数据 -->
     <insert id="batchInsert" parameterType="java.util.List">
-        INSERT INTO mes_production_data (
+        INSERT IGNORE INTO mes_production_data (
         task_id, data_type, data_value, collection_time,
         operator_id, remark, create_time, update_time,
         create_user, update_user, is_deleted
