@@ -1,12 +1,14 @@
 package com.mes.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.mes.entity.DefectDetail;
 import com.mes.entity.Inventory;
 import com.mes.entity.PickList;
 import com.mes.entity.PickListDetail;
 import com.mes.entity.ProductionOrder;
 import com.mes.entity.ProductionTask;
 import com.mes.entity.QualityTask;
+import com.mes.mapper.DefectDetailMapper;
 import com.mes.mapper.InventoryMapper;
 import com.mes.mapper.PickListDetailMapper;
 import com.mes.mapper.PickListMapper;
@@ -33,6 +35,7 @@ import java.util.stream.Collectors;
 public class BatchTraceService {
 
     private final QualityTaskMapper qualityTaskMapper;
+    private final DefectDetailMapper defectDetailMapper;
     private final PickListMapper pickListMapper;
     private final PickListDetailMapper pickListDetailMapper;
     private final ProductionOrderMapper productionOrderMapper;
@@ -47,6 +50,10 @@ public class BatchTraceService {
         List<QualityTask> inspectionTasks = qualityTaskMapper.selectList(
                 new LambdaQueryWrapper<QualityTask>().eq(QualityTask::getBatchNo, batchNo));
         trace.setInspectionTasks(inspectionTasks);
+
+        List<DefectDetail> defects = defectDetailMapper.selectList(
+                new LambdaQueryWrapper<DefectDetail>().eq(DefectDetail::getBatchNo, batchNo));
+        trace.setDefects(defects);
 
         List<PickListDetail> pickedMaterials = pickListDetailMapper.selectByBatchNumber(batchNo);
         trace.setPickedMaterials(pickedMaterials);

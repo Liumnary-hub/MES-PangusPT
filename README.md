@@ -33,7 +33,7 @@
 | 质量 | 检验计划/任务、缺陷代码/明细、合格率、Pareto、SPC |
 | 设备 | 设备台账、点检、保养、故障记录、状态日志 |
 | 设备数据 | REST 批量上报、RabbitMQ 异步入库、Modbus TCP 主动采集、实时/历史查询 |
-| 追溯 | 批次 → 质量任务 → 工单 → 工序任务 → 领料 → 库存批次 |
+| 追溯 | 批次 → 质量任务 → 缺陷 → 工单 → 工序任务 → 领料 → 库存批次 |
 | 排产 | 排产计划、排产明细、班次日历 |
 | 系统 | 登录鉴权、用户/角色、登录日志 |
 
@@ -99,7 +99,7 @@ DeviceDataConsumer → 批量入库（INSERT IGNORE）
 
 ### 6. 批次全流程追溯
 
-`GET /api/trace/batch/{batchNo}` 返回 `BatchTraceVO`，串联质量任务、工单、工序任务、领料明细与库存批次；无关联记录返回 404。
+`GET /api/trace/batch/{batchNo}` 返回 `BatchTraceVO`，串联质量任务、缺陷明细、工单、工序任务、领料明细与库存批次；无关联记录返回 404。
 
 ## 快速开始
 
@@ -206,6 +206,7 @@ curl http://localhost:8080/api/trace/batch/BATCH20240101 \
   "data": {
     "batchNo": "BATCH20240101",
     "inspectionTasks": [{ "taskNo": "QT...", "batchNo": "BATCH20240101", "orderNo": "WO..." }],
+    "defects": [{ "defectCode": "D001", "defectName": "表面划痕", "defectQuantity": 2, "batchNo": "BATCH20240101" }],
     "orders": [{ "orderCode": "WO...", "status": "in_progress" }],
     "processTasks": [{ "taskCode": "TASK...", "operationSequence": 1 }],
     "pickLists": [{ "pickListCode": "PL...", "workOrderCode": "WO..." }],
@@ -214,6 +215,24 @@ curl http://localhost:8080/api/trace/batch/BATCH20240101 \
   }
 }
 ```
+
+## 测试
+
+```bash
+# 全量测试（需 MySQL、Redis、RabbitMQ 已启动）
+mvn test
+
+# 仅并发与追溯测试
+mvn -Dtest=InventoryConcurrencyTest test
+```
+
+`InventoryConcurrencyTest` 覆盖：
+
+| 用例 | 断言 |
+| --- | --- |
+| 20 线程并发锁定 100 库存，每次 10 | 只成功 10 次，`locked_quantity = 100` |
+| 10 线程并发扣减 50 已锁定库存，每次 10 | 只成功 5 次，现存量与锁定量归零 |
+| 按批次写入缺陷后查询追溯 | 追溯结果包含该缺陷节点 |
 
 ## 项目结构
 

@@ -83,7 +83,7 @@ public class DefectDetail {
     @TableField(exist = false)
     private String productName;           // 产品名称
 
-    @TableField(exist = false)
+    @TableField("batch_no")
     private String batchNo;               // 批次号
 
     @TableField(exist = false)

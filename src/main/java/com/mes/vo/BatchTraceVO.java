@@ -1,5 +1,6 @@
 package com.mes.vo;
 
+import com.mes.entity.DefectDetail;
 import com.mes.entity.Inventory;
 import com.mes.entity.PickList;
 import com.mes.entity.PickListDetail;
@@ -21,6 +22,9 @@ public class BatchTraceVO {
 
     /** 质量检验任务 */
     private List<QualityTask> inspectionTasks = new ArrayList<>();
+
+    /** 该批次检出的缺陷明细 */
+    private List<DefectDetail> defects = new ArrayList<>();
 
     /** 关联生产工单 */
     private List<ProductionOrder> orders = new ArrayList<>();

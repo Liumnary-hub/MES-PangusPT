@@ -23,6 +23,7 @@ public class TraceController {
     public Result<BatchTraceVO> traceByBatchNo(@PathVariable String batchNo) {
         BatchTraceVO trace = batchTraceService.traceByBatchNo(batchNo);
         boolean empty = trace.getInspectionTasks().isEmpty()
+                && trace.getDefects().isEmpty()
                 && trace.getOrders().isEmpty()
                 && trace.getProcessTasks().isEmpty()
                 && trace.getPickLists().isEmpty()
