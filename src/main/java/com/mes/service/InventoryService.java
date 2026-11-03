@@ -29,6 +29,7 @@ public interface InventoryService extends IService<Inventory> {
 
     boolean lockStock(Long materialId, Long locationId, String batchNumber, BigDecimal quantity);
     boolean unlockStock(Long materialId, Long locationId, String batchNumber, BigDecimal quantity);
+    boolean deductStock(Long materialId, Long locationId, String batchNumber, BigDecimal quantity);
 
     // 添加缺失的方法
     Inventory getByMaterialAndLocation(Long materialId, Long locationId, String batchNumber);

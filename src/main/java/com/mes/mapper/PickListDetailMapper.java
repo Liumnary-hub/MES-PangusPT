@@ -20,4 +20,7 @@ public interface PickListDetailMapper extends BaseMapper<PickListDetail> {
 
     @Select("SELECT * FROM mes_pick_list_detail WHERE pick_list_id = #{pickListId} AND status = 'pending'")
     List<PickListDetail> selectPendingByPickListId(@Param("pickListId") Long pickListId);
+
+    @Select("SELECT * FROM mes_pick_list_detail WHERE batch_number = #{batchNumber}")
+    List<PickListDetail> selectByBatchNumber(@Param("batchNumber") String batchNumber);
 }

@@ -259,8 +259,12 @@ public class PickListServiceImpl extends ServiceImpl<PickListMapper, PickList> i
         List<PickListDetail> details = pickListDetailMapper.selectByPickListId(pickListId);
         for (PickListDetail detail : details) {
             if (detail.getPickedQuantity().compareTo(BigDecimal.ZERO) > 0) {
-                // TODO: 释放锁定的库存
-                // inventoryService.unlockInventory(...);
+                inventoryService.unlockStock(
+                        detail.getMaterialId(),
+                        detail.getLocationId(),
+                        detail.getBatchNumber(),
+                        detail.getPickedQuantity()
+                );
             }
         }
 
@@ -293,11 +297,15 @@ public class PickListServiceImpl extends ServiceImpl<PickListMapper, PickList> i
         pickList.setUpdateUser(SecurityUtils.getUsername());
         pickList.setUpdateTime(LocalDateTime.now());
 
-        // 执行库存出库
+        // 执行库存出库：扣减已锁定的库存
         for (PickListDetail detail : details) {
             if (detail.getPickedQuantity().compareTo(BigDecimal.ZERO) > 0) {
-                // TODO: 执行库存出库
-                // inventoryService.recordOutTransaction(...);
+                inventoryService.deductStock(
+                        detail.getMaterialId(),
+                        detail.getLocationId(),
+                        detail.getBatchNumber(),
+                        detail.getPickedQuantity()
+                );
             }
         }
 

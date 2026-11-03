@@ -108,14 +108,10 @@ public class InventoryServiceImpl extends ServiceImpl<InventoryMapper, Inventory
             throw new RuntimeException("源库存记录不存在");
         }
 
-        if (fromInventory.getAvailableQuantity().compareTo(quantity) < 0) {
+        // 原子扣减源库存：可用量不足时影响行数为 0
+        if (inventoryMapper.deductAvailableStockById(fromInventoryId, quantity) == 0) {
             throw new RuntimeException("可用库存不足");
         }
-
-        // 减少源库存
-        fromInventory.setCurrentQuantity(fromInventory.getCurrentQuantity().subtract(quantity));
-        fromInventory.setLastUpdateTime(LocalDateTime.now());
-        inventoryMapper.updateById(fromInventory);
 
         // 查找或创建目标库存记录
         LambdaQueryWrapper<Inventory> wrapper = new LambdaQueryWrapper<>();
@@ -141,9 +137,7 @@ public class InventoryServiceImpl extends ServiceImpl<InventoryMapper, Inventory
 
             inventoryMapper.insert(toInventory);
         } else {
-            toInventory.setCurrentQuantity(toInventory.getCurrentQuantity().add(quantity));
-            toInventory.setLastUpdateTime(LocalDateTime.now());
-            inventoryMapper.updateById(toInventory);
+            inventoryMapper.increaseStockById(toInventory.getId(), quantity);
         }
 
         return true;
@@ -157,14 +151,11 @@ public class InventoryServiceImpl extends ServiceImpl<InventoryMapper, Inventory
             throw new RuntimeException("库存记录不存在");
         }
 
-        if (inventory.getAvailableQuantity().compareTo(quantity) < 0) {
+        if (inventoryMapper.lockStockById(inventoryId, quantity) == 0) {
             throw new RuntimeException("可用库存不足，无法锁定");
         }
 
-        inventory.setLockedQuantity(inventory.getLockedQuantity().add(quantity));
-        inventory.setLastUpdateTime(LocalDateTime.now());
-
-        return inventoryMapper.updateById(inventory) > 0;
+        return true;
     }
 
     @Override
@@ -175,14 +166,11 @@ public class InventoryServiceImpl extends ServiceImpl<InventoryMapper, Inventory
             throw new RuntimeException("库存记录不存在");
         }
 
-        if (inventory.getLockedQuantity().compareTo(quantity) < 0) {
+        if (inventoryMapper.unlockStockById(inventoryId, quantity) == 0) {
             throw new RuntimeException("锁定库存不足，无法释放");
         }
 
-        inventory.setLockedQuantity(inventory.getLockedQuantity().subtract(quantity));
-        inventory.setLastUpdateTime(LocalDateTime.now());
-
-        return inventoryMapper.updateById(inventory) > 0;
+        return true;
     }
 
     @Override
@@ -419,16 +407,11 @@ public class InventoryServiceImpl extends ServiceImpl<InventoryMapper, Inventory
             throw new RuntimeException("库存记录不存在");
         }
 
-        // 检查可用库存是否充足
-        BigDecimal availableQuantity = inventory.getCurrentQuantity().subtract(inventory.getLockedQuantity());
-        if (availableQuantity.compareTo(quantity) < 0) {
+        // 原子锁定：数据库条件保证并发下不会超锁
+        if (inventoryMapper.lockStockById(inventory.getId(), quantity) == 0) {
             throw new RuntimeException("可用库存不足，无法锁定");
         }
-
-        // 锁定库存
-        inventory.setLockedQuantity(inventory.getLockedQuantity().add(quantity));
-        inventory.setLastUpdateTime(LocalDateTime.now());
-        return inventoryMapper.updateById(inventory) > 0;
+        return true;
     }
 
     @Override
@@ -439,14 +422,24 @@ public class InventoryServiceImpl extends ServiceImpl<InventoryMapper, Inventory
             throw new RuntimeException("库存记录不存在");
         }
 
-        // 检查锁定库存是否足够
-        if (inventory.getLockedQuantity().compareTo(quantity) < 0) {
+        if (inventoryMapper.unlockStockById(inventory.getId(), quantity) == 0) {
             throw new RuntimeException("锁定库存不足，无法释放");
         }
+        return true;
+    }
 
-        // 释放锁定库存
-        inventory.setLockedQuantity(inventory.getLockedQuantity().subtract(quantity));
-        inventory.setLastUpdateTime(LocalDateTime.now());
-        return inventoryMapper.updateById(inventory) > 0;
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public boolean deductStock(Long materialId, Long locationId, String batchNumber, BigDecimal quantity) {
+        Inventory inventory = getByMaterialAndLocation(materialId, locationId, batchNumber);
+        if (inventory == null) {
+            throw new RuntimeException("库存记录不存在");
+        }
+
+        // 领料出库：现存量与锁定量同时扣减，任一不足则整体失败
+        if (inventoryMapper.deductLockedStockById(inventory.getId(), quantity) == 0) {
+            throw new RuntimeException("库存扣减失败，库存不足或已被占用");
+        }
+        return true;
     }
 }
