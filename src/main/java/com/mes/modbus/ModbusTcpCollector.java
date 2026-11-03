@@ -76,7 +76,8 @@ public class ModbusTcpCollector {
             if (delta > 0) {
                 dataList.add(build(taskId, "quantity", String.valueOf(delta)));
             }
-            dataList.add(build(taskId, "quality", qualified >= produced ? "qualified" : "unqualified"));
+            double defectRate = produced > 0 ? (double) (produced - qualified) / produced : 0;
+            dataList.add(build(taskId, "quality", defectRate <= 0.05 ? "qualified" : "unqualified"));
             dataList.add(build(taskId, "equipment", statusName(status)));
 
             deviceDataPublisher.publish(dataList);

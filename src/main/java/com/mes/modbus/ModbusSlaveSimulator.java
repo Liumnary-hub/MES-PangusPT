@@ -79,7 +79,7 @@ public class ModbusSlaveSimulator implements Runnable {
         }
 
         int current = produced.addAndGet(2);
-        int qualified = current - current / 20;
+        int qualified = current - current / 100; // 模拟 1% 不良率
         int[] registers = {current, qualified, 1, taskId};
 
         out.writeShort(transactionId);
