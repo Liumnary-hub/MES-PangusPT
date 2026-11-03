@@ -452,3 +452,32 @@ CREATE TABLE IF NOT EXISTS `mes_work_shift` (
   PRIMARY KEY (`id`),
   KEY `idx_is_deleted` (`is_deleted`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- 演示数据：批次 DEMO-2026-001 的完整追溯链路
+INSERT IGNORE INTO `mes_production_order`
+(`id`, `order_code`, `product_code`, `planned_quantity`, `completed_quantity`, `status`, `priority`, `create_time`, `update_time`, `is_deleted`)
+VALUES (9001, 'WO-DEMO-001', 'P-DEMO-001', 100, 40, 'in_progress', 5, NOW(), NOW(), 0);
+
+INSERT IGNORE INTO `mes_production_task`
+(`id`, `task_code`, `order_id`, `order_code`, `product_code`, `operation_sequence`, `operation_name`, `planned_quantity`, `completed_quantity`, `qualified_quantity`, `status`, `quality_status`, `create_time`, `update_time`, `is_deleted`)
+VALUES (9001, 'TASK-DEMO-001', 9001, 'WO-DEMO-001', 'P-DEMO-001', 1, '下料', 100, 40, 38, 'in_progress', 'pending', NOW(), NOW(), 0);
+
+INSERT IGNORE INTO `mes_quality_task`
+(`id`, `task_no`, `batch_no`, `order_no`, `product_code`, `product_name`, `quantity_checked`, `quantity_qualified`, `quantity_defective`, `result`, `status`, `inspection_type`, `deleted`, `create_time`, `update_time`)
+VALUES (9001, 'QT-DEMO-001', 'DEMO-2026-001', 'WO-DEMO-001', 'P-DEMO-001', '演示产品', 40, 38, 2, 'qualified', 'COMPLETED', 'PROCESS', 0, NOW(), NOW());
+
+INSERT IGNORE INTO `mes_defect_detail`
+(`id`, `task_id`, `defect_code`, `defect_name`, `defect_quantity`, `severity`, `description`, `batch_no`, `deleted`, `create_time`)
+VALUES (9001, 9001, 'D001', '表面划痕', 2, 'MINOR', '演示缺陷', 'DEMO-2026-001', 0, NOW());
+
+INSERT IGNORE INTO `mes_inventory`
+(`id`, `material_id`, `material_code`, `location_id`, `location_code`, `current_quantity`, `locked_quantity`, `available_quantity`, `batch_number`, `quality_status`, `last_update_time`)
+VALUES (9001, 9001, 'M-DEMO-001', 9001, 'L-DEMO-001', 500, 0, 500, 'DEMO-2026-001', 'qualified', NOW());
+
+INSERT IGNORE INTO `mes_pick_list`
+(`id`, `pick_list_code`, `work_order_id`, `work_order_code`, `task_id`, `task_code`, `status`, `create_time`, `update_time`, `is_deleted`)
+VALUES (9001, 'PL-DEMO-001', 9001, 'WO-DEMO-001', 9001, 'TASK-DEMO-001', 'completed', NOW(), NOW(), 0);
+
+INSERT IGNORE INTO `mes_pick_list_detail`
+(`id`, `pick_list_id`, `material_id`, `material_code`, `location_id`, `location_code`, `batch_number`, `required_quantity`, `picked_quantity`, `status`)
+VALUES (9001, 9001, 9001, 'M-DEMO-001', 9001, 'L-DEMO-001', 'DEMO-2026-001', 10, 10, 'picked');

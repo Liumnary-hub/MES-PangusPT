@@ -113,7 +113,7 @@ docker compose up -d
 
 ### 2. 数据库
 
-无需手工建库。JDBC URL 带 `createDatabaseIfNotExist=true`，启动时 `schema.sql` 自动建表（`CREATE TABLE IF NOT EXISTS`），Hibernate 负责 JPA 表结构。
+无需手工建库。JDBC URL 带 `createDatabaseIfNotExist=true`，启动时 `schema.sql` 自动建表（`CREATE TABLE IF NOT EXISTS`），Hibernate 负责 JPA 表结构。脚本内置演示数据，批次 `DEMO-2026-001` 可直接用于追溯演示。
 
 默认连接：`localhost:3306/mes`，账号 `root / 1234`，可用环境变量覆盖。
 
@@ -196,7 +196,8 @@ curl -X POST http://localhost:8080/api/production-data/batch \
 ## 追溯接口示例
 
 ```bash
-curl http://localhost:8080/api/trace/batch/BATCH20240101 \
+# 内置演示批次，可直接返回完整链路
+curl http://localhost:8080/api/trace/batch/DEMO-2026-001 \
   -H "Authorization: Bearer <token>"
 ```
 
