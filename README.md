@@ -2,6 +2,19 @@
 
 基于 Spring Boot 3 的 MES 后端，覆盖「工单 → 任务 → 工序 → 领料 → 库存 → 质量 → 设备 → 排产」主链路，并提供设备数据采集、批次追溯与运维配套。
 
+## 架构
+
+```mermaid
+flowchart LR
+    PLC[PLC / 设备] -->|Modbus TCP| COLLECTOR[采集器]
+    REST[REST 批量上报] --> MQ[RabbitMQ]
+    COLLECTOR --> MQ
+    MQ --> CONSUMER[消费者批量入库]
+    CONSUMER --> DB[(MySQL)]
+    API[业务 / 追溯接口] --> DB
+    API --> CACHE[(Redis)]
+```
+
 ## 技术栈
 
 | 类别 | 选型 |

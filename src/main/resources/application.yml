@@ -37,7 +37,8 @@ spring:
 
 app:
   jwt:
-    secret: "${JWT_SECRET:cGFuZ3VNYW51ZmFjdHVyaW5nU2VjcmV0S2V5MjAyNFNlY3VyaXR5SldUVG9rZW5Gb3JBdXRoZW50aWNhdGlvbg==}"
+    # 仅本地开发默认值，生产环境必须通过 JWT_SECRET 覆盖
+    secret: "${JWT_SECRET:tQV00WZs8y4cifNVgshbBcc7fQ+TYyjxLKk0KkAUJE0WawNBmRTyoUnEu4zlaBLM}"
     expiration-ms: ${JWT_EXPIRATION_MS:86400000}
 
 logging:
