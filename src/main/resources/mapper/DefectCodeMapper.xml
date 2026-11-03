@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.mes.mapper.DefectCodeMapper">
+
+    <resultMap id="BaseResultMap" type="com.mes.entity.DefectCode">
+        <id column="id" property="id" />
+        <result column="defect_code" property="defectCode" />
+        <result column="defect_name" property="defectName" />
+        <result column="defect_type" property="defectType" />
+        <result column="severity" property="severity" />
+        <result column="description" property="description" />
+        <result column="handling_method" property="handlingMethod" />
+        <result column="enabled" property="enabled" />
+        <result column="create_time" property="createTime" />
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id, defect_code, defect_name, defect_type, severity,
+        description, handling_method, enabled, create_time
+    </sql>
+
+    <!-- 分页查询缺陷代码 -->
+    <select id="selectDefectCodeList" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List" />
+        FROM mes_defect_code
+        <where>
+            <if test="query.defectCode != null and query.defectCode != ''">
+                AND defect_code LIKE CONCAT('%', #{query.defectCode}, '%')
+            </if>
+            <if test="query.defectName != null and query.defectName != ''">
+                AND defect_name LIKE CONCAT('%', #{query.defectName}, '%')
+            </if>
+            <if test="query.defectType != null and query.defectType != ''">
+                AND defect_type = #{query.defectType}
+            </if>
+            <if test="query.severity != null and query.severity != ''">
+                AND severity = #{query.severity}
+            </if>
+            <if test="query.enabled != null">
+                AND enabled = #{query.enabled}
+            </if>
+        </where>
+        ORDER BY defect_code ASC
+    </select>
+
+    <!-- 根据缺陷代码查询 -->
+    <select id="selectByDefectCode" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List" />
+        FROM mes_defect_code
+        WHERE defect_code = #{defectCode}
+    </select>
+
+    <!-- 根据缺陷类型查询 -->
+    <select id="selectByDefectType" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List" />
+        FROM mes_defect_code
+        WHERE defect_type = #{defectType}
+        AND enabled = 1
+        ORDER BY defect_code ASC
+    </select>
+
+    <!-- 批量更新启用状态 -->
+    <update id="updateBatchStatus">
+        UPDATE mes_defect_code
+        SET enabled = #{enabled}
+        WHERE id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </update>
+
+    <!-- 获取所有启用的缺陷代码 -->
+    <select id="selectAllEnabled" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List" />
+        FROM mes_defect_code
+        WHERE enabled = 1
+        ORDER BY defect_code ASC
+    </select>
+
+</mapper>

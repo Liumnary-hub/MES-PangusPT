@@ -1,0 +1,200 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.mes.mapper.BomMapper">
+
+    <!-- 通用查询映射结果 -->
+    <resultMap id="BaseResultMap" type="com.mes.entity.Bom">
+        <id column="id" property="id" />
+        <result column="bom_code" property="bomCode" />
+        <result column="product_id" property="productId" />
+        <result column="product_code" property="productCode" />
+        <result column="version" property="version" />
+        <result column="status" property="status" />
+        <result column="effective_date" property="effectiveDate" />
+        <result column="expiry_date" property="expiryDate" />
+        <result column="create_time" property="createTime" />
+        <result column="update_time" property="updateTime" />
+        <result column="create_user" property="createUser" />
+        <result column="update_user" property="updateUser" />
+        <result column="is_deleted" property="isDeleted" />
+    </resultMap>
+
+    <!-- BOM VO 结果映射 -->
+    <resultMap id="BomVOResultMap" type="com.mes.vo.BomVO">
+        <id column="id" property="id"/>
+        <result column="bom_code" property="bomCode"/>
+        <result column="product_id" property="productId"/>
+        <result column="product_code" property="productCode"/>
+        <result column="product_name" property="productName"/>
+        <result column="version" property="version"/>
+        <result column="status" property="status"/>
+        <result column="effective_date" property="effectiveDate"/>
+        <result column="expiry_date" property="expiryDate"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+        <result column="create_user" property="createUser"/>
+        <result column="update_user" property="updateUser"/>
+
+        <!-- 物料相关字段（用于物料需求计算） -->
+        <result column="material_id" property="materialId"/>
+        <result column="material_code" property="materialCode"/>
+        <result column="material_name" property="materialName"/>
+        <result column="current_quantity" property="currentQuantity"/>
+    </resultMap>
+
+    <!-- BOM 分页查询 -->
+    <select id="selectBomPage" resultMap="BomVOResultMap">
+        SELECT
+        b.*,
+        p.product_name
+        FROM mes_bom b
+        LEFT JOIN mes_product_definition p ON b.product_id = p.id
+        WHERE b.is_deleted = 0
+        <if test="vo.bomCode != null and vo.bomCode != ''">
+            AND b.bom_code LIKE CONCAT('%', #{vo.bomCode}, '%')
+        </if>
+        <if test="vo.productCode != null and vo.productCode != ''">
+            AND b.product_code LIKE CONCAT('%', #{vo.productCode}, '%')
+        </if>
+        <if test="vo.productName != null and vo.productName != ''">
+            AND p.product_name LIKE CONCAT('%', #{vo.productName}, '%')
+        </if>
+        <if test="vo.status != null and vo.status != ''">
+            AND b.status = #{vo.status}
+        </if>
+        <if test="vo.productId != null">
+            AND b.product_id = #{vo.productId}
+        </if>
+        ORDER BY b.create_time DESC
+    </select>
+
+    <!-- BOM 列表查询 -->
+    <select id="selectBomList" resultMap="BomVOResultMap">
+        SELECT
+        b.*,
+        p.product_name
+        FROM mes_bom b
+        LEFT JOIN mes_product_definition p ON b.product_id = p.id
+        WHERE b.is_deleted = 0
+        <if test="vo.bomCode != null and vo.bomCode != ''">
+            AND b.bom_code LIKE CONCAT('%', #{vo.bomCode}, '%')
+        </if>
+        <if test="vo.productCode != null and vo.productCode != ''">
+            AND b.product_code LIKE CONCAT('%', #{vo.productCode}, '%')
+        </if>
+        <if test="vo.productName != null and vo.productName != ''">
+            AND p.product_name LIKE CONCAT('%', #{vo.productName}, '%')
+        </if>
+        <if test="vo.status != null and vo.status != ''">
+            AND b.status = #{vo.status}
+        </if>
+        <if test="vo.productId != null">
+            AND b.product_id = #{vo.productId}
+        </if>
+        ORDER BY b.create_time DESC
+    </select>
+
+    <!-- 根据产品ID查询激活的BOM -->
+    <select id="selectActiveByProductId" resultMap="BaseResultMap">
+        SELECT *
+        FROM mes_bom
+        WHERE product_id = #{productId}
+          AND status = 'active'
+          AND is_deleted = 0
+        ORDER BY create_time DESC
+            LIMIT 1
+    </select>
+
+    <!-- 检查BOM编码是否唯一 -->
+    <select id="countByBomCodeExcludeId" resultType="int">
+        SELECT COUNT(*)
+        FROM mes_bom
+        WHERE bom_code = #{bomCode}
+        AND is_deleted = 0
+        <if test="excludeId != null">
+            AND id != #{excludeId}
+        </if>
+    </select>
+
+    <!-- 根据产品编码查询BOM -->
+    <select id="selectByProductCode" resultMap="BaseResultMap">
+        SELECT *
+        FROM mes_bom
+        WHERE product_code = #{productCode}
+          AND is_deleted = 0
+        ORDER BY create_time DESC
+            LIMIT 1
+    </select>
+
+    <!-- 获取产品的所有BOM版本 -->
+    <select id="selectBomVersionsByProduct" resultMap="BaseResultMap">
+        SELECT *
+        FROM mes_bom
+        WHERE product_id = #{productId}
+          AND is_deleted = 0
+        ORDER BY create_time DESC
+    </select>
+
+    <!-- 根据状态查询BOM列表 -->
+    <select id="selectByStatus" resultMap="BaseResultMap">
+        SELECT *
+        FROM mes_bom
+        WHERE status = #{status}
+          AND is_deleted = 0
+        ORDER BY create_time DESC
+    </select>
+
+    <!-- 查询过期的BOM -->
+    <select id="selectExpiredBoms" resultMap="BaseResultMap">
+        SELECT *
+        FROM mes_bom
+        WHERE expiry_date IS NOT NULL
+          AND expiry_date &lt; NOW()
+          AND status = 'active'
+          AND is_deleted = 0
+    </select>
+
+    <!-- 查询即将生效的BOM -->
+    <select id="selectFutureEffectiveBoms" resultMap="BaseResultMap">
+        SELECT *
+        FROM mes_bom
+        WHERE effective_date IS NOT NULL
+          AND effective_date &gt; NOW()
+          AND status = 'active'
+          AND is_deleted = 0
+    </select>
+
+    <!-- 批量更新BOM状态 -->
+    <update id="updateBomStatusBatch">
+        UPDATE mes_bom
+        SET status = #{status},
+        update_user = #{updateUser},
+        update_time = NOW()
+        WHERE id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </update>
+
+    <!-- 逻辑删除BOM -->
+    <update id="deleteBomById">
+        UPDATE mes_bom
+        SET is_deleted = 1,
+            update_user = #{updateUser},
+            update_time = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <!-- 批量逻辑删除BOM -->
+    <update id="deleteBomByIds">
+        UPDATE mes_bom
+        SET is_deleted = 1,
+        update_user = #{updateUser},
+        update_time = NOW()
+        WHERE id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </update>
+
+</mapper>

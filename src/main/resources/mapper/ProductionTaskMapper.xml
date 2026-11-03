@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.mes.mapper.ProductionTaskMapper">
+
+    <select id="selectByStatus" resultType="com.mes.entity.ProductionTask">
+        SELECT * FROM mes_production_task
+        WHERE status = #{status} AND is_deleted = 0
+        ORDER BY planned_start_time
+    </select>
+
+    <update id="updateTaskStatus">
+        UPDATE mes_production_task
+        SET status = #{status}, update_time = NOW()
+        WHERE id = #{id} AND is_deleted = 0
+    </update>
+
+    <update id="updateTaskProgress">
+        UPDATE mes_production_task
+        SET completed_quantity = #{completedQuantity},
+            qualified_quantity = #{qualifiedQuantity},
+            actual_time = #{actualTime},
+            update_time = NOW()
+        WHERE id = #{id} AND is_deleted = 0
+    </update>
+
+    <select id="selectTaskPage" resultType="com.mes.entity.ProductionTask">
+        SELECT t.*, o.order_code, p.product_name, r.resource_name
+        FROM mes_production_task t
+        LEFT JOIN mes_production_order o ON t.order_id = o.id
+        LEFT JOIN mes_product_definition p ON t.product_id = p.id
+        LEFT JOIN mes_production_resource r ON t.resource_id = r.id
+        WHERE t.is_deleted = 0
+        <if test="taskCode != null and taskCode != ''">
+            AND t.task_code LIKE CONCAT('%', #{taskCode}, '%')
+        </if>
+        <if test="orderId != null">
+            AND t.order_id = #{orderId}
+        </if>
+        <if test="resourceId != null">
+            AND t.resource_id = #{resourceId}
+        </if>
+        <if test="status != null and status != ''">
+            AND t.status = #{status}
+        </if>
+        ORDER BY t.create_time DESC
+    </select>
+
+</mapper>

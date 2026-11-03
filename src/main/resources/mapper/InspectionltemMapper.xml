@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.mes.mapper.InspectionItemMapper">
+
+    <resultMap id="BaseResultMap" type="com.mes.entity.InspectionItem">
+        <id column="id" property="id" />
+        <result column="standard_id" property="standardId" />
+        <result column="item_code" property="itemCode" />
+        <result column="item_name" property="itemName" />
+        <result column="inspection_method" property="inspectionMethod" />
+        <result column="unit" property="unit" />
+        <result column="standard_value" property="standardValue" />
+        <result column="upper_limit" property="upperLimit" />
+        <result column="lower_limit" property="lowerLimit" />
+        <result column="data_type" property="dataType" />
+        <result column="options" property="options" />
+        <result column="is_critical" property="isCritical" />
+        <result column="sequence" property="sequence" />
+        <result column="equipment" property="equipment" />
+        <result column="remark" property="remark" />
+        <result column="create_time" property="createTime" />
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id, standard_id, item_code, item_name, inspection_method, unit,
+        standard_value, upper_limit, lower_limit, data_type, options,
+        is_critical, sequence, equipment, remark, create_time
+    </sql>
+
+    <!-- 根据标准ID查询检验项目 -->
+    <select id="selectByStandardId" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List" />
+        FROM mes_inspection_item
+        WHERE standard_id = #{standardId}
+        ORDER BY sequence ASC
+    </select>
+
+    <!-- 根据标准ID统计检验项目数量 -->
+    <select id="countByStandardId" resultType="java.lang.Long">
+        SELECT COUNT(1)
+        FROM mes_inspection_item
+        WHERE standard_id = #{standardId}
+    </select>
+
+    <!-- 根据标准ID删除检验项目 -->
+    <delete id="deleteByStandardId">
+        DELETE FROM mes_inspection_item
+        WHERE standard_id = #{standardId}
+    </delete>
+
+    <!-- 批量插入检验项目 -->
+    <insert id="insertBatch" parameterType="java.util.List">
+        INSERT INTO mes_inspection_item (
+            standard_id, item_code, item_name, inspection_method, unit,
+            standard_value, upper_limit, lower_limit, data_type, options,
+            is_critical, sequence, equipment, remark, create_time
+        ) VALUES
+        <foreach collection="items" item="item" separator=",">
+            (
+                #{item.standardId}, #{item.itemCode}, #{item.itemName}, #{item.inspectionMethod},
+                #{item.unit}, #{item.standardValue}, #{item.upperLimit}, #{item.lowerLimit},
+                #{item.dataType}, #{item.options}, #{item.isCritical}, #{item.sequence},
+                #{item.equipment}, #{item.remark}, #{item.createTime}
+            )
+        </foreach>
+    </insert>
+
+</mapper>

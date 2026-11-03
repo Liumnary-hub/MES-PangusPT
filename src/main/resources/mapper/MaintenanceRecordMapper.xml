@@ -1,0 +1,219 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.mes.mapper.MaintenanceRecordMapper">
+
+    <resultMap id="BaseResultMap" type="com.mes.entity.MaintenanceRecord">
+        <id column="record_id" property="recordId" />
+        <result column="maintenance_no" property="maintenanceNo" />
+        <result column="equipment_id" property="equipmentId" />
+        <result column="record_type" property="recordType" />
+        <result column="sub_type" property="subType" />
+        <result column="status" property="status" />
+        <result column="plan_id" property="planId" />
+        <result column="plan_start_time" property="planStartTime" />
+        <result column="plan_end_time" property="planEndTime" />
+        <result column="actual_start_time" property="actualStartTime" />
+        <result column="actual_end_time" property="actualEndTime" />
+        <result column="maintainer" property="maintainer" />
+        <result column="maintainer_id" property="maintainerId" />
+        <result column="maintenance_team" property="maintenanceTeam" />
+        <result column="description" property="description" />
+        <result column="before_status" property="beforeStatus" />
+        <result column="after_status" property="afterStatus" />
+        <result column="spare_parts" property="spareParts" />
+        <result column="spare_parts_cost" property="sparePartsCost" />
+        <result column="labor_cost" property="laborCost" />
+        <result column="total_cost" property="totalCost" />
+        <result column="result" property="result" />
+        <result column="abnormal_desc" property="abnormalDesc" />
+        <result column="acceptor" property="acceptor" />
+        <result column="acceptance_time" property="acceptanceTime" />
+        <result column="acceptance_opinion" property="acceptanceOpinion" />
+        <result column="downtime_hours" property="downtimeHours" />
+        <result column="related_fault_id" property="relatedFaultId" />
+        <result column="inspection_data" property="inspectionData" />
+        <result column="create_time" property="createTime" />
+        <result column="create_by" property="createBy" />
+        <result column="update_time" property="updateTime" />
+        <result column="update_by" property="updateBy" />
+        <result column="details" property="details" />
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        record_id, maintenance_no, equipment_id, record_type, sub_type, status, plan_id,
+        plan_start_time, plan_end_time, actual_start_time, actual_end_time, maintainer,
+        maintainer_id, maintenance_team, description, before_status, after_status,
+        spare_parts, spare_parts_cost, labor_cost, total_cost, result, abnormal_desc,
+        acceptor, acceptance_time, acceptance_opinion, downtime_hours, related_fault_id,
+        inspection_data, create_time, create_by, update_time, update_by, details
+    </sql>
+
+    <!-- 根据设备ID查询 -->
+    <select id="selectByEquipmentId" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List" />
+        FROM mes_maintenance_record
+        WHERE equipment_id = #{equipmentId}
+        ORDER BY create_time DESC
+    </select>
+
+    <!-- 根据维护单号查询 -->
+    <select id="selectByMaintenanceNo" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List" />
+        FROM mes_maintenance_record
+        WHERE maintenance_no = #{maintenanceNo}
+    </select>
+
+    <!-- 查询超期未完成的维护记录 -->
+    <select id="selectOverdueRecords" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List" />
+        FROM mes_maintenance_record
+        WHERE status IN (1, 2) -- 已计划或进行中
+        AND plan_end_time &lt; NOW()
+        ORDER BY plan_end_time ASC
+    </select>
+
+    <!-- 条件分页查询 -->
+    <select id="selectMaintenancePage" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List" />
+        FROM mes_maintenance_record
+        WHERE 1=1
+        <if test="query.maintenanceNo != null and query.maintenanceNo != ''">
+            AND maintenance_no LIKE CONCAT('%', #{query.maintenanceNo}, '%')
+        </if>
+        <if test="query.equipmentId != null">
+            AND equipment_id = #{query.equipmentId}
+        </if>
+        <if test="query.recordType != null">
+            AND record_type = #{query.recordType}
+        </if>
+        <if test="query.subType != null and query.subType != ''">
+            AND sub_type = #{query.subType}
+        </if>
+        <if test="query.status != null">
+            AND status = #{query.status}
+        </if>
+        <if test="query.maintainer != null and query.maintainer != ''">
+            AND maintainer LIKE CONCAT('%', #{query.maintainer}, '%')
+        </if>
+        <if test="query.startTime != null">
+            AND create_time >= #{query.startTime}
+        </if>
+        <if test="query.endTime != null">
+            AND create_time &lt;= #{query.endTime}
+        </if>
+        <if test="query.result != null">
+            AND result = #{query.result}
+        </if>
+        ORDER BY
+        <choose>
+            <when test="query.sortField != null and query.sortField != ''">
+                ${query.sortField} ${query.sortOrder}
+            </when>
+            <otherwise>
+                create_time DESC
+            </otherwise>
+        </choose>
+    </select>
+
+    <!-- 统计各类型维护数量 -->
+    <select id="countByRecordType" resultType="map">
+        SELECT
+            record_type,
+            COUNT(*) as count,
+            SUM(total_cost) as totalCost,
+            AVG(downtime_hours) as avgDowntime
+        FROM mes_maintenance_record
+        WHERE create_time >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+        GROUP BY record_type
+    </select>
+
+    <!-- 统计各状态维护数量 -->
+    <select id="countByStatus" resultType="map">
+        SELECT
+            status,
+            COUNT(*) as count
+        FROM mes_maintenance_record
+        GROUP BY status
+    </select>
+
+    <!-- 统计设备维护次数 -->
+    <select id="countMaintenanceByEquipment" resultType="map">
+        SELECT
+            e.equipment_code,
+            e.equipment_name,
+            COUNT(mr.record_id) as maintenanceCount,
+            SUM(mr.total_cost) as totalCost
+        FROM mes_equipment e
+                 LEFT JOIN mes_maintenance_record mr ON e.equipment_id = mr.equipment_id
+        WHERE e.is_active = 1
+        GROUP BY e.equipment_id, e.equipment_code, e.equipment_name
+        ORDER BY maintenanceCount DESC
+            LIMIT 10
+    </select>
+
+    <!-- 统计维护成本（按月） -->
+    <select id="sumCostByMonth" resultType="map">
+        SELECT
+            DATE_FORMAT(create_time, '%Y-%m') as month,
+            COUNT(*) as count,
+            SUM(total_cost) as totalCost,
+            SUM(spare_parts_cost) as sparePartsCost,
+            SUM(labor_cost) as laborCost
+        FROM mes_maintenance_record
+        WHERE YEAR(create_time) = #{year}
+        GROUP BY DATE_FORMAT(create_time, '%Y-%m')
+        ORDER BY month
+    </select>
+
+    <!-- 更新维护状态 -->
+    <update id="updateMaintenanceStatus">
+        UPDATE mes_maintenance_record
+        SET
+            status = #{status},
+            update_time = #{updateTime}
+        WHERE record_id = #{recordId}
+    </update>
+
+    <!-- 完成维护记录 -->
+    <update id="completeMaintenance">
+        UPDATE mes_maintenance_record
+        SET
+            status = 3, -- 已完成
+            actual_end_time = #{actualEndTime},
+            result = #{result},
+            acceptor = #{acceptor},
+            acceptance_time = #{acceptanceTime},
+            update_time = NOW()
+        WHERE record_id = #{recordId}
+    </update>
+
+    <!-- 查询设备的最近维护记录 -->
+    <select id="selectRecentByEquipmentId" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List" />
+        FROM mes_maintenance_record
+        WHERE equipment_id = #{equipmentId}
+        ORDER BY actual_start_time DESC
+        LIMIT 1
+    </select>
+
+    <!-- 查询维护记录详情（包含设备信息） -->
+    <select id="selectDetailById" resultMap="BaseResultMap">
+        SELECT
+            mr.*,
+            e.equipment_code,
+            e.equipment_name,
+            e.equipment_type,
+            e.workshop,
+            e.location
+        FROM mes_maintenance_record mr
+                 LEFT JOIN mes_equipment e ON mr.equipment_id = e.equipment_id
+        WHERE mr.record_id = #{recordId}
+    </select>
+
+</mapper>

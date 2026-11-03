@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.mes.mapper.InventoryTransactionMapper">
+
+    <resultMap id="InventoryTransactionVOResultMap" type="com.mes.vo.InventoryTransactionVO">
+        <id column="id" property="id"/>
+        <result column="transaction_type" property="transactionType"/>
+        <result column="material_id" property="materialId"/>
+        <result column="material_code" property="materialCode"/>
+        <result column="from_location_id" property="fromLocationId"/>
+        <result column="from_location_code" property="fromLocationCode"/>
+        <result column="to_location_id" property="toLocationId"/>
+        <result column="to_location_code" property="toLocationCode"/>
+        <result column="quantity" property="quantity"/>
+        <result column="batch_number" property="batchNumber"/>
+        <result column="reference_type" property="referenceType"/>
+        <result column="reference_id" property="referenceId"/>
+        <result column="reference_code" property="referenceCode"/>
+        <result column="transaction_time" property="transactionTime"/>
+        <result column="operator_id" property="operatorId"/>
+        <result column="operator_name" property="operatorName"/>
+        <result column="remark" property="remark"/>
+        <result column="create_time" property="createTime"/>
+        <!-- 关联字段 -->
+        <result column="material_name" property="materialName"/>
+        <result column="from_location_name" property="fromLocationName"/>
+        <result column="to_location_name" property="toLocationName"/>
+    </resultMap>
+
+    <select id="selectTransactionPage" resultMap="InventoryTransactionVOResultMap">
+        SELECT
+        t.*,
+        m.material_name,
+        fl.location_name as from_location_name,
+        tl.location_name as to_location_name
+        FROM mes_inventory_transaction t
+        LEFT JOIN mes_material m ON t.material_id = m.id
+        LEFT JOIN mes_warehouse_location fl ON t.from_location_id = fl.id
+        LEFT JOIN mes_warehouse_location tl ON t.to_location_id = tl.id
+        WHERE 1=1
+        <if test="vo.materialCode != null and vo.materialCode != ''">
+            AND t.material_code LIKE CONCAT('%', #{vo.materialCode}, '%')
+        </if>
+        <if test="vo.transactionType != null and vo.transactionType != ''">
+            AND t.transaction_type = #{vo.transactionType}
+        </if>
+        <if test="vo.referenceType != null and vo.referenceType != ''">
+            AND t.reference_type = #{vo.referenceType}
+        </if>
+        <if test="vo.referenceCode != null and vo.referenceCode != ''">
+            AND t.reference_code LIKE CONCAT('%', #{vo.referenceCode}, '%')
+        </if>
+        <if test="vo.startTime != null">
+            AND t.transaction_time >= #{vo.startTime}
+        </if>
+        <if test="vo.endTime != null">
+            AND t.transaction_time &lt;= #{vo.endTime}
+        </if>
+        ORDER BY t.transaction_time DESC
+    </select>
+
+    <select id="selectByReference" resultType="com.mes.entity.InventoryTransaction">
+        SELECT *
+        FROM mes_inventory_transaction
+        WHERE reference_type = #{referenceType}
+          AND reference_id = #{referenceId}
+        ORDER BY transaction_time DESC
+    </select>
+
+    <select id="selectMaterialTransactionHistory" resultMap="InventoryTransactionVOResultMap">
+        SELECT
+            t.*,
+            m.material_name,
+            fl.location_name as from_location_name,
+            tl.location_name as to_location_name
+        FROM mes_inventory_transaction t
+                 LEFT JOIN mes_material m ON t.material_id = m.id
+                 LEFT JOIN mes_warehouse_location fl ON t.from_location_id = fl.id
+                 LEFT JOIN mes_warehouse_location tl ON t.to_location_id = tl.id
+        WHERE t.material_id = #{materialId}
+        ORDER BY t.transaction_time DESC
+            LIMIT 100
+    </select>
+
+</mapper>

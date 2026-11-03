@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.mes.mapper.InventoryMapper">
+
+    <resultMap id="InventoryVOResultMap" type="com.mes.vo.InventoryVO">
+        <id column="id" property="id"/>
+        <result column="material_id" property="materialId"/>
+        <result column="material_code" property="materialCode"/>
+        <result column="location_id" property="locationId"/>
+        <result column="location_code" property="locationCode"/>
+        <result column="current_quantity" property="currentQuantity"/>
+        <result column="locked_quantity" property="lockedQuantity"/>
+        <result column="available_quantity" property="availableQuantity"/>
+        <result column="batch_number" property="batchNumber"/>
+        <result column="supplier_batch" property="supplierBatch"/>
+        <result column="production_date" property="productionDate"/>
+        <result column="expiry_date" property="expiryDate"/>
+        <result column="quality_status" property="qualityStatus"/>
+        <result column="last_update_time" property="lastUpdateTime"/>
+
+        <!-- 关联字段 -->
+        <result column="material_name" property="materialName"/>
+        <result column="material_type" property="materialType"/>
+        <result column="specification" property="specification"/>
+        <result column="unit" property="unit"/>
+        <result column="warehouse_code" property="warehouseCode"/>
+        <result column="warehouse_name" property="warehouseName"/>
+    </resultMap>
+
+    <!-- 分页查询库存列表 -->
+    <select id="selectInventoryPage" resultMap="InventoryVOResultMap">
+        SELECT
+        i.*,
+        m.material_name,
+        m.material_type,
+        m.specification,
+        m.unit,
+        wl.warehouse_code,
+        wl.warehouse_name
+        FROM mes_inventory i
+        LEFT JOIN mes_material m ON i.material_id = m.id
+        LEFT JOIN mes_warehouse_location wl ON i.location_id = wl.id
+        WHERE 1=1
+        <if test="vo.materialCode != null and vo.materialCode != ''">
+            AND i.material_code LIKE CONCAT('%', #{vo.materialCode}, '%')
+        </if>
+        <if test="vo.materialName != null and vo.materialName != ''">
+            AND m.material_name LIKE CONCAT('%', #{vo.materialName}, '%')
+        </if>
+        <if test="vo.locationCode != null and vo.locationCode != ''">
+            AND i.location_code LIKE CONCAT('%', #{vo.locationCode}, '%')
+        </if>
+        <if test="vo.batchNumber != null and vo.batchNumber != ''">
+            AND i.batch_number LIKE CONCAT('%', #{vo.batchNumber}, '%')
+        </if>
+        <if test="vo.qualityStatus != null and vo.qualityStatus != ''">
+            AND i.quality_status = #{vo.qualityStatus}
+        </if>
+        ORDER BY i.last_update_time DESC
+    </select>
+
+    <!-- 查询物料库存汇总 -->
+    <select id="selectMaterialInventorySummary" resultMap="InventoryVOResultMap">
+        SELECT
+            i.material_id,
+            i.material_code,
+            m.material_name,
+            SUM(i.current_quantity) as current_quantity,
+            SUM(i.locked_quantity) as locked_quantity,
+            SUM(i.current_quantity - i.locked_quantity) as available_quantity
+        FROM mes_inventory i
+                 LEFT JOIN mes_material m ON i.material_id = m.id
+        WHERE i.material_id = #{materialId}
+        GROUP BY i.material_id, i.material_code, m.material_name
+    </select>
+
+    <!-- 根据物料ID查询库存列表 -->
+    <select id="selectByMaterialId" resultMap="InventoryVOResultMap">
+        SELECT
+            i.*,
+            m.material_name,
+            m.material_type,
+            m.specification,
+            m.unit,
+            wl.warehouse_code,
+            wl.warehouse_name
+        FROM mes_inventory i
+                 LEFT JOIN mes_material m ON i.material_id = m.id
+                 LEFT JOIN mes_warehouse_location wl ON i.location_id = wl.id
+        WHERE i.material_id = #{materialId}
+        ORDER BY i.last_update_time DESC
+    </select>
+
+    <!-- 根据库位ID查询库存列表 -->
+    <select id="selectByLocationId" resultMap="InventoryVOResultMap">
+        SELECT
+            i.*,
+            m.material_name,
+            m.material_type,
+            m.specification,
+            m.unit,
+            wl.warehouse_code,
+            wl.warehouse_name
+        FROM mes_inventory i
+                 LEFT JOIN mes_material m ON i.material_id = m.id
+                 LEFT JOIN mes_warehouse_location wl ON i.location_id = wl.id
+        WHERE i.location_id = #{locationId}
+        ORDER BY i.last_update_time DESC
+    </select>
+
+    <!-- 更新库存数量 -->
+    <update id="updateStockQuantity">
+        UPDATE mes_inventory
+        SET current_quantity = #{currentQuantity},
+            locked_quantity = #{lockedQuantity},
+            last_update_time = NOW()
+        WHERE id = #{id}
+    </update>
+
+</mapper>

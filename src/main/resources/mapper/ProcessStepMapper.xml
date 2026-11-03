@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.mes.mapper.ProcessStepMapper">
+
+    <!-- 条件分页查询工序 -->
+    <select id="selectStepsByCondition" resultType="com.mes.entity.ProcessStep">
+        SELECT * FROM mes_process_step
+        WHERE is_deleted = 0
+        <if test="stepCode != null and stepCode != ''">
+            AND step_code LIKE CONCAT('%', #{stepCode}, '%')
+        </if>
+        <if test="stepName != null and stepName != ''">
+            AND step_name LIKE CONCAT('%', #{stepName}, '%')
+        </if>
+        <if test="routeId != null">
+            AND route_id = #{routeId}
+        </if>
+        ORDER BY sequence ASC, create_time DESC
+    </select>
+
+    <!-- 根据工艺路线ID查询工序 -->
+    <select id="selectStepsByRouteId" resultType="com.mes.entity.ProcessStep">
+        SELECT * FROM mes_process_step
+        WHERE route_id = #{routeId} AND is_deleted = 0
+        ORDER BY sequence ASC
+    </select>
+
+    <!-- 根据资源类型查询工序 -->
+    <select id="selectStepsByResourceType" resultType="com.mes.entity.ProcessStep">
+        SELECT * FROM mes_process_step
+        WHERE resource_type = #{resourceType} AND is_deleted = 0
+        ORDER BY sequence ASC
+    </select>
+
+    <!-- 删除指定工艺路线的所有工序 -->
+    <delete id="deleteByRouteId">
+        UPDATE mes_process_step
+        SET is_deleted = 1, update_time = NOW()
+        WHERE route_id = #{routeId} AND is_deleted = 0
+    </delete>
+
+    <!-- 批量插入工序 -->
+    <insert id="batchInsert" parameterType="java.util.List">
+        INSERT INTO mes_process_step (
+        step_code, step_name, route_id, sequence, resource_type,
+        standard_time, setup_time, description, quality_standard,
+        create_time, update_time, create_user, update_user, is_deleted
+        ) VALUES
+        <foreach collection="list" item="item" index="index" separator=",">
+            (
+            #{item.stepCode}, #{item.stepName}, #{item.routeId}, #{item.sequence}, #{item.resourceType},
+            #{item.standardTime}, #{item.setupTime}, #{item.description}, #{item.qualityStandard},
+            NOW(), NOW(), #{item.createUser}, #{item.updateUser}, 0
+            )
+        </foreach>
+    </insert>
+
+    <!-- 更新工序顺序 -->
+    <update id="updateStepSequence">
+        UPDATE mes_process_step
+        SET sequence = #{sequence}, update_time = NOW()
+        WHERE id = #{stepId} AND is_deleted = 0
+    </update>
+
+    <!-- 获取工艺路线的最大工序序号 -->
+    <select id="selectMaxSequenceByRouteId" resultType="java.lang.Integer">
+        SELECT COALESCE(MAX(sequence), 0)
+        FROM mes_process_step
+        WHERE route_id = #{routeId} AND is_deleted = 0
+    </select>
+
+    <!-- 检查工序编码是否已存在 -->
+    <select id="existsByStepCode" resultType="java.lang.Boolean">
+        SELECT COUNT(*) > 0
+        FROM mes_process_step
+        WHERE step_code = #{stepCode} AND is_deleted = 0
+        <if test="excludeId != null">
+            AND id != #{excludeId}
+        </if>
+    </select>
+
+    <!-- 根据多个ID查询工序 -->
+    <select id="selectStepsByIds" resultType="com.mes.entity.ProcessStep">
+        SELECT * FROM mes_process_step
+        WHERE id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+        AND is_deleted = 0
+        ORDER BY sequence ASC
+    </select>
+
+</mapper>

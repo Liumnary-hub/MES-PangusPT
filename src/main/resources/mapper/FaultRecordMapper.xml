@@ -1,0 +1,549 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.mes.mapper.FaultRecordMapper">
+
+    <!-- 基础结果映射 -->
+    <resultMap id="BaseResultMap" type="com.mes.entity.FaultRecord">
+        <id column="fault_id" property="faultId" />
+        <result column="fault_no" property="faultNo" />
+        <result column="equipment_id" property="equipmentId" />
+        <result column="fault_type" property="faultType" />
+        <result column="fault_level" property="faultLevel" />
+        <result column="fault_status" property="faultStatus" />
+        <result column="occur_time" property="occurTime" />
+        <result column="discoverer" property="discoverer" />
+        <result column="discoverer_id" property="discovererId" />
+        <result column="phenomenon" property="phenomenon" />
+        <result column="cause_analysis" property="causeAnalysis" />
+        <result column="temporary_measures" property="temporaryMeasures" />
+        <result column="treatment_measures" property="treatmentMeasures" />
+        <result column="treatment_start_time" property="treatmentStartTime" />
+        <result column="treatment_end_time" property="treatmentEndTime" />
+        <result column="handler" property="handler" />
+        <result column="handler_id" property="handlerId" />
+        <result column="actual_downtime_hours" property="actualDowntimeHours" />
+        <result column="impact_scope" property="impactScope" />
+        <result column="impact_output" property="impactOutput" />
+        <result column="estimated_loss" property="estimatedLoss" />
+        <result column="root_cause" property="rootCause" />
+        <result column="preventive_measures" property="preventiveMeasures" />
+        <result column="is_recurring" property="isRecurring" />
+        <result column="related_maintenance_id" property="relatedMaintenanceId" />
+        <result column="fault_images" property="faultImages" />
+        <result column="closer" property="closer" />
+        <result column="close_time" property="closeTime" />
+        <result column="create_time" property="createTime" />
+        <result column="create_by" property="createBy" />
+        <result column="update_time" property="updateTime" />
+        <result column="update_by" property="updateBy" />
+    </resultMap>
+
+    <!-- 包含设备信息的扩展结果映射 -->
+    <resultMap id="DetailResultMap" type="com.mes.entity.FaultRecord" extends="BaseResultMap">
+        <association property="equipmentId" javaType="com.mes.entity.Equipment">
+            <id column="e_equipment_id" property="equipmentId" />
+            <result column="e_equipment_code" property="equipmentCode" />
+            <result column="e_equipment_name" property="equipmentName" />
+            <result column="e_equipment_type" property="equipmentType" />
+            <result column="e_workshop" property="workshop" />
+            <result column="e_location" property="location" />
+            <result column="e_responsible_person" property="responsiblePerson" />
+            <result column="e_status" property="status" />
+        </association>
+    </resultMap>
+
+    <!-- 基础列名 -->
+    <sql id="Base_Column_List">
+        fault_id, fault_no, equipment_id, fault_type, fault_level, fault_status, occur_time,
+        discoverer, discoverer_id, phenomenon, cause_analysis, temporary_measures, treatment_measures,
+        treatment_start_time, treatment_end_time, handler, handler_id, actual_downtime_hours,
+        impact_scope, impact_output, estimated_loss, root_cause, preventive_measures,
+        is_recurring, related_maintenance_id, fault_images, closer, close_time,
+        create_time, create_by, update_time, update_by
+    </sql>
+
+    <!-- 设备信息列名 -->
+    <sql id="Equipment_Column_List">
+        e.equipment_id as e_equipment_id,
+        e.equipment_code as e_equipment_code,
+        e.equipment_name as e_equipment_name,
+        e.equipment_type as e_equipment_type,
+        e.workshop as e_workshop,
+        e.location as e_location,
+        e.responsible_person as e_responsible_person,
+        e.status as e_status
+    </sql>
+
+    <!-- 根据设备ID查询故障记录 -->
+    <select id="selectByEquipmentId" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List" />
+        FROM mes_fault_record
+        WHERE equipment_id = #{equipmentId}
+        ORDER BY occur_time DESC
+    </select>
+
+    <!-- 根据故障单号查询 -->
+    <select id="selectByFaultNo" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List" />
+        FROM mes_fault_record
+        WHERE fault_no = #{faultNo}
+    </select>
+
+    <!-- 根据故障状态查询 -->
+    <select id="selectByFaultStatus" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List" />
+        FROM mes_fault_record
+        WHERE fault_status = #{faultStatus}
+        ORDER BY occur_time DESC
+    </select>
+
+    <!-- 根据故障等级查询 -->
+    <select id="selectByFaultLevel" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List" />
+        FROM mes_fault_record
+        WHERE fault_level = #{faultLevel}
+        ORDER BY occur_time DESC
+    </select>
+
+    <!-- 查询未解决的故障 -->
+    <select id="selectUnresolvedFaults" resultMap="DetailResultMap">
+        SELECT
+        f.*,
+        <include refid="Equipment_Column_List" />
+        FROM mes_fault_record f
+        LEFT JOIN mes_equipment e ON f.equipment_id = e.equipment_id
+        WHERE f.fault_status IN (1, 2)  <!-- 已上报、处理中 -->
+        ORDER BY
+        CASE f.fault_level
+        WHEN 4 THEN 1  <!-- 重大 -->
+        WHEN 3 THEN 2  <!-- 严重 -->
+        WHEN 2 THEN 3  <!-- 一般 -->
+        ELSE 4
+        END,
+        f.occur_time DESC
+    </select>
+
+    <!-- 查询超期未处理的故障 -->
+    <select id="selectOverdueFaults" resultMap="DetailResultMap">
+        SELECT
+        f.*,
+        <include refid="Equipment_Column_List" />
+        FROM mes_fault_record f
+        LEFT JOIN mes_equipment e ON f.equipment_id = e.equipment_id
+        WHERE f.fault_status = 2  <!-- 处理中 -->
+        AND f.treatment_start_time IS NOT NULL
+        AND TIMESTAMPDIFF(HOUR, f.treatment_start_time, NOW()) > 24  <!-- 超过24小时 -->
+        ORDER BY f.treatment_start_time ASC
+    </select>
+
+    <!-- 条件分页查询故障记录 -->
+    <select id="selectFaultPage" resultMap="DetailResultMap">
+        SELECT
+        f.*,
+        <include refid="Equipment_Column_List" />
+        FROM mes_fault_record f
+        LEFT JOIN mes_equipment e ON f.equipment_id = e.equipment_id
+        WHERE 1=1
+        <if test="query.faultNo != null and query.faultNo != ''">
+            AND f.fault_no LIKE CONCAT('%', #{query.faultNo}, '%')
+        </if>
+        <if test="query.equipmentId != null">
+            AND f.equipment_id = #{query.equipmentId}
+        </if>
+        <if test="query.equipmentCode != null and query.equipmentCode != ''">
+            AND e.equipment_code = #{query.equipmentCode}
+        </if>
+        <if test="query.equipmentName != null and query.equipmentName != ''">
+            AND e.equipment_name LIKE CONCAT('%', #{query.equipmentName}, '%')
+        </if>
+        <if test="query.faultType != null">
+            AND f.fault_type = #{query.faultType}
+        </if>
+        <if test="query.faultLevel != null">
+            AND f.fault_level = #{query.faultLevel}
+        </if>
+        <if test="query.faultStatus != null">
+            AND f.fault_status = #{query.faultStatus}
+        </if>
+        <if test="query.occurTimeStart != null">
+            AND f.occur_time >= #{query.occurTimeStart}
+        </if>
+        <if test="query.occurTimeEnd != null">
+            AND f.occur_time &lt;= #{query.occurTimeEnd}
+        </if>
+        <if test="query.discoverer != null and query.discoverer != ''">
+            AND f.discoverer LIKE CONCAT('%', #{query.discoverer}, '%')
+        </if>
+        <if test="query.handler != null and query.handler != ''">
+            AND f.handler LIKE CONCAT('%', #{query.handler}, '%')
+        </if>
+        <if test="query.isRecurring != null">
+            AND f.is_recurring = #{query.isRecurring}
+        </if>
+        <if test="query.isOverdue != null and query.isOverdue">
+            AND f.fault_status = 2
+            AND f.treatment_start_time IS NOT NULL
+            AND TIMESTAMPDIFF(HOUR, f.treatment_start_time, NOW()) > 24
+        </if>
+        <if test="query.workshop != null and query.workshop != ''">
+            AND e.workshop = #{query.workshop}
+        </if>
+        <if test="query.equipmentType != null and query.equipmentType != ''">
+            AND e.equipment_type = #{query.equipmentType}
+        </if>
+        <!-- 关键词搜索 -->
+        <if test="query.keyword != null and query.keyword != ''">
+            AND (
+            f.fault_no LIKE CONCAT('%', #{query.keyword}, '%')
+            OR f.phenomenon LIKE CONCAT('%', #{query.keyword}, '%')
+            OR f.treatment_measures LIKE CONCAT('%', #{query.keyword}, '%')
+            OR f.cause_analysis LIKE CONCAT('%', #{query.keyword}, '%')
+            OR e.equipment_code LIKE CONCAT('%', #{query.keyword}, '%')
+            OR e.equipment_name LIKE CONCAT('%', #{query.keyword}, '%')
+            )
+        </if>
+        <!-- 包含已关闭的记录判断 -->
+        <if test="query.includeClosed != null and !query.includeClosed">
+            AND f.fault_status != 4
+        </if>
+        ORDER BY
+        <choose>
+            <when test="query.sortField != null and query.sortField != ''">
+                <choose>
+                    <when test="query.sortField == 'occurTime'">f.occur_time</when>
+                    <when test="query.sortField == 'treatmentStartTime'">f.treatment_start_time</when>
+                    <when test="query.sortField == 'faultLevel'">f.fault_level</when>
+                    <when test="query.sortField == 'faultStatus'">f.fault_status</when>
+                    <when test="query.sortField == 'equipmentCode'">e.equipment_code</when>
+                    <when test="query.sortField == 'equipmentName'">e.equipment_name</when>
+                    <otherwise>f.${query.sortField}</otherwise>
+                </choose>
+                ${query.sortOrder}
+            </when>
+            <otherwise>
+                f.occur_time DESC
+            </otherwise>
+        </choose>
+    </select>
+
+    <!-- 统计各类型故障数量 -->
+    <select id="countByFaultType" resultType="java.util.Map">
+        SELECT
+        fault_type,
+        COUNT(*) as count,
+        SUM(estimated_loss) as total_loss,
+        AVG(actual_downtime_hours) as avg_downtime
+        FROM mes_fault_record
+        WHERE 1=1
+        <if test="startTime != null">
+            AND occur_time >= #{startTime}
+        </if>
+        <if test="endTime != null">
+            AND occur_time &lt;= #{endTime}
+        </if>
+        GROUP BY fault_type
+        ORDER BY count DESC
+    </select>
+
+    <!-- 统计各等级故障数量 -->
+    <select id="countByFaultLevel" resultType="java.util.Map">
+        SELECT
+        fault_level,
+        COUNT(*) as count,
+        SUM(estimated_loss) as total_loss,
+        AVG(actual_downtime_hours) as avg_downtime
+        FROM mes_fault_record
+        WHERE 1=1
+        <if test="startTime != null">
+            AND occur_time >= #{startTime}
+        </if>
+        <if test="endTime != null">
+            AND occur_time &lt;= #{endTime}
+        </if>
+        GROUP BY fault_level
+        ORDER BY fault_level
+    </select>
+
+    <!-- 统计各状态故障数量 -->
+    <select id="countByFaultStatus" resultType="java.util.Map">
+        SELECT
+        fault_status,
+        COUNT(*) as count,
+        SUM(CASE WHEN fault_status = 3 THEN estimated_loss ELSE 0 END) as resolved_loss,
+        SUM(CASE WHEN fault_status = 2 THEN actual_downtime_hours ELSE 0 END) as processing_downtime
+        FROM mes_fault_record
+        WHERE 1=1
+        <if test="startTime != null">
+            AND occur_time >= #{startTime}
+        </if>
+        <if test="endTime != null">
+            AND occur_time &lt;= #{endTime}
+        </if>
+        GROUP BY fault_status
+        ORDER BY fault_status
+    </select>
+
+    <!-- 统计设备故障次数 -->
+    <select id="countFaultByEquipment" resultType="java.util.Map">
+        SELECT
+        e.equipment_code,
+        e.equipment_name,
+        e.equipment_type,
+        e.workshop,
+        COUNT(f.fault_id) as fault_count,
+        SUM(f.estimated_loss) as total_loss,
+        SUM(f.actual_downtime_hours) as total_downtime,
+        AVG(f.actual_downtime_hours) as avg_downtime
+        FROM mes_equipment e
+        LEFT JOIN mes_fault_record f ON e.equipment_id = f.equipment_id
+        WHERE e.is_active = 1
+        <if test="startTime != null">
+            AND f.occur_time >= #{startTime}
+        </if>
+        <if test="endTime != null">
+            AND f.occur_time &lt;= #{endTime}
+        </if>
+        GROUP BY e.equipment_id, e.equipment_code, e.equipment_name, e.equipment_type, e.workshop
+        HAVING fault_count > 0
+        ORDER BY fault_count DESC
+        LIMIT 20
+    </select>
+
+    <!-- 统计故障损失（按月） -->
+    <select id="sumLossByMonth" resultType="java.util.Map">
+        SELECT
+            DATE_FORMAT(occur_time, '%Y-%m') as month,
+            COUNT(*) as fault_count,
+            SUM(estimated_loss) as total_loss,
+            SUM(actual_downtime_hours) as total_downtime,
+            AVG(actual_downtime_hours) as avg_downtime,
+            AVG(estimated_loss) as avg_loss
+        FROM mes_fault_record
+        WHERE YEAR(occur_time) = #{year}
+        GROUP BY DATE_FORMAT(occur_time, '%Y-%m')
+        ORDER BY month
+    </select>
+
+    <!-- 更新故障状态 -->
+    <update id="updateFaultStatus">
+        UPDATE mes_fault_record
+        SET
+        fault_status = #{faultStatus},
+        update_time = #{updateTime}
+        <if test="faultStatus == 4">
+            , closer = #{operator}
+            , close_time = #{updateTime}
+        </if>
+        WHERE fault_id = #{faultId}
+    </update>
+
+    <!-- 开始处理故障 -->
+    <update id="startTreatment">
+        UPDATE mes_fault_record
+        SET
+        fault_status = 2,  <!-- 处理中 -->
+        handler = #{handler},
+        handler_id = #{handlerId},
+        treatment_start_time = #{treatmentStartTime},
+        update_time = NOW()
+        WHERE fault_id = #{faultId}
+    </update>
+
+    <!-- 完成故障处理 -->
+    <update id="completeTreatment">
+        UPDATE mes_fault_record
+        SET
+        fault_status = 3,  <!-- 已解决 -->
+        treatment_end_time = #{treatmentEndTime},
+        treatment_measures = #{treatmentMeasures},
+        root_cause = #{rootCause},
+        preventive_measures = #{preventiveMeasures},
+        actual_downtime_hours = TIMESTAMPDIFF(HOUR, treatment_start_time, #{treatmentEndTime}),
+        update_time = NOW()
+        WHERE fault_id = #{faultId}
+    </update>
+
+    <!-- 关闭故障记录 -->
+    <update id="closeFault">
+        UPDATE mes_fault_record
+        SET
+        fault_status = 4,  <!-- 已关闭 -->
+        closer = #{closer},
+        close_time = NOW(),
+        update_time = NOW()
+        WHERE fault_id = #{faultId}
+        AND fault_status = 3  <!-- 只有已解决的故障才能关闭 -->
+    </update>
+
+    <!-- 查询重复故障 -->
+    <select id="selectRecurringFaults" resultMap="DetailResultMap">
+        SELECT
+        f.*,
+        <include refid="Equipment_Column_List" />
+        FROM mes_fault_record f
+        LEFT JOIN mes_equipment e ON f.equipment_id = e.equipment_id
+        WHERE f.equipment_id = #{equipmentId}
+        AND f.is_recurring = 1
+        ORDER BY f.occur_time DESC
+    </select>
+
+    <!-- 查询故障详情（包含设备信息） -->
+    <select id="selectDetailById" resultMap="DetailResultMap">
+        SELECT
+        f.*,
+        <include refid="Equipment_Column_List" />
+        FROM mes_fault_record f
+        LEFT JOIN mes_equipment e ON f.equipment_id = e.equipment_id
+        WHERE f.fault_id = #{faultId}
+    </select>
+
+    <!-- 批量插入故障记录 -->
+    <insert id="insertBatch">
+        INSERT INTO mes_fault_record (
+        fault_no, equipment_id, fault_type, fault_level, fault_status, occur_time,
+        discoverer, discoverer_id, phenomenon, cause_analysis, temporary_measures,
+        treatment_measures, treatment_start_time, treatment_end_time, handler, handler_id,
+        actual_downtime_hours, impact_scope, impact_output, estimated_loss, root_cause,
+        preventive_measures, is_recurring, related_maintenance_id, fault_images, closer,
+        close_time, create_time, create_by, update_time, update_by
+        ) VALUES
+        <foreach collection="list" item="fault" separator=",">
+            (
+            #{fault.faultNo},
+            #{fault.equipmentId},
+            #{fault.faultType},
+            #{fault.faultLevel},
+            #{fault.faultStatus},
+            #{fault.occurTime},
+            #{fault.discoverer},
+            #{fault.discovererId},
+            #{fault.phenomenon},
+            #{fault.causeAnalysis},
+            #{fault.temporaryMeasures},
+            #{fault.treatmentMeasures},
+            #{fault.treatmentStartTime},
+            #{fault.treatmentEndTime},
+            #{fault.handler},
+            #{fault.handlerId},
+            #{fault.actualDowntimeHours},
+            #{fault.impactScope},
+            #{fault.impactOutput},
+            #{fault.estimatedLoss},
+            #{fault.rootCause},
+            #{fault.preventiveMeasures},
+            #{fault.isRecurring},
+            #{fault.relatedMaintenanceId},
+            #{fault.faultImages},
+            #{fault.closer},
+            #{fault.closeTime},
+            #{fault.createTime},
+            #{fault.createBy},
+            #{fault.updateTime},
+            #{fault.updateBy}
+            )
+        </foreach>
+    </insert>
+
+    <!-- 批量逻辑删除 -->
+    <update id="deleteLogicBatch">
+        UPDATE mes_fault_record
+        SET is_deleted = 1,
+        update_time = NOW()
+        WHERE fault_id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </update>
+
+    <!-- 获取设备故障统计摘要 -->
+    <select id="selectEquipmentFaultSummary" resultType="java.util.Map">
+        SELECT
+        e.equipment_id,
+        e.equipment_code,
+        e.equipment_name,
+        COUNT(f.fault_id) as total_faults,
+        SUM(CASE WHEN f.fault_status IN (1,2) THEN 1 ELSE 0 END) as unresolved_faults,
+        SUM(CASE WHEN f.fault_status = 3 THEN 1 ELSE 0 END) as resolved_faults,
+        SUM(f.estimated_loss) as total_loss,
+        SUM(f.actual_downtime_hours) as total_downtime,
+        AVG(f.actual_downtime_hours) as avg_downtime,
+        MAX(f.occur_time) as last_fault_time
+        FROM mes_equipment e
+        LEFT JOIN mes_fault_record f ON e.equipment_id = f.equipment_id
+        WHERE e.is_active = 1
+        <if test="workshop != null and workshop != ''">
+            AND e.workshop = #{workshop}
+        </if>
+        <if test="equipmentType != null and equipmentType != ''">
+            AND e.equipment_type = #{equipmentType}
+        </if>
+        <if test="startTime != null">
+            AND f.occur_time >= #{startTime}
+        </if>
+        <if test="endTime != null">
+            AND f.occur_time &lt;= #{endTime}
+        </if>
+        GROUP BY e.equipment_id, e.equipment_code, e.equipment_name
+        HAVING total_faults > 0
+        ORDER BY total_faults DESC
+    </select>
+
+    <!-- 获取故障趋势数据（按天） -->
+    <select id="selectFaultTrendByDay" resultType="java.util.Map">
+        SELECT
+        DATE(occur_time) as date,
+        COUNT(*) as fault_count,
+        SUM(estimated_loss) as total_loss,
+        SUM(actual_downtime_hours) as total_downtime,
+        SUM(CASE WHEN fault_level = 4 THEN 1 ELSE 0 END) as critical_count,
+        SUM(CASE WHEN fault_level = 3 THEN 1 ELSE 0 END) as serious_count
+        FROM mes_fault_record
+        WHERE 1=1
+        <if test="startTime != null">
+            AND occur_time >= #{startTime}
+        </if>
+        <if test="endTime != null">
+            AND occur_time &lt;= #{endTime}
+        </if>
+        <if test="equipmentId != null">
+            AND equipment_id = #{equipmentId}
+        </if>
+        <if test="workshop != null and workshop != ''">
+            AND equipment_id IN (SELECT equipment_id FROM mes_equipment WHERE workshop = #{workshop})
+        </if>
+        GROUP BY DATE(occur_time)
+        ORDER BY date
+    </select>
+
+    <!-- 获取MTBF（平均故障间隔时间）和MTTR（平均修复时间） -->
+    <select id="selectMtbfMttr" resultType="java.util.Map">
+        WITH fault_sequence AS (
+        SELECT
+        equipment_id,
+        occur_time,
+        treatment_start_time,
+        treatment_end_time,
+        actual_downtime_hours,
+        LAG(occur_time) OVER (PARTITION BY equipment_id ORDER BY occur_time) as prev_occur_time
+        FROM mes_fault_record
+        WHERE fault_status = 3  <!-- 已解决 -->
+        AND occur_time IS NOT NULL
+        AND treatment_end_time IS NOT NULL
+        )
+        SELECT
+        equipment_id,
+        AVG(TIMESTAMPDIFF(HOUR, prev_occur_time, occur_time)) as mtbf_hours,
+        AVG(actual_downtime_hours) as mttr_hours,
+        COUNT(*) as sample_count
+        FROM fault_sequence
+        WHERE prev_occur_time IS NOT NULL
+        GROUP BY equipment_id
+        HAVING sample_count >= 3  <!-- 至少3次故障才有统计意义 -->
+    </select>
+
+</mapper>

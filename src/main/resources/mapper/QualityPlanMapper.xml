@@ -1,0 +1,195 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.mes.mapper.QualityPlanMapper">
+
+    <resultMap id="BaseResultMap" type="com.mes.entity.QualityPlan">
+        <id column="id" property="id" />
+        <result column="plan_no" property="planNo" />
+        <result column="plan_name" property="planName" />
+        <result column="product_id" property="productId" />
+        <result column="batch_no" property="batchNo" />
+        <result column="plan_type" property="planType" />
+        <result column="frequency" property="frequency" />
+        <result column="plan_date" property="planDate" />
+        <result column="sample_size" property="sampleSize" />
+        <result column="total_quantity" property="totalQuantity" />
+        <result column="inspector" property="inspector" />
+        <result column="status" property="status" />
+        <result column="approval_by" property="approvalBy" />
+        <result column="approval_time" property="approvalTime" />
+        <result column="remark" property="remark" />
+        <result column="create_by" property="createBy" />
+        <result column="create_time" property="createTime" />
+        <result column="update_by" property="updateBy" />
+        <result column="update_time" property="updateTime" />
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id, plan_no, plan_name, product_id, batch_no, plan_type, frequency,
+        plan_date, sample_size, total_quantity, inspector, status,
+        approval_by, approval_time, remark, create_by, create_time,
+        update_by, update_time
+    </sql>
+
+    <!-- 分页查询检验计划列表 -->
+    <select id="selectPlanList" resultMap="BaseResultMap">
+        SELECT
+        p.*,
+        pd.product_code,
+        pd.product_name
+        FROM mes_quality_plan p
+        LEFT JOIN mes_product_definition pd ON p.product_id = pd.id
+        <where>
+            p.status != 'DELETED'
+            <if test="query.planNo != null and query.planNo != ''">
+                AND p.plan_no LIKE CONCAT('%', #{query.planNo}, '%')
+            </if>
+            <if test="query.planName != null and query.planName != ''">
+                AND p.plan_name LIKE CONCAT('%', #{query.planName}, '%')
+            </if>
+            <if test="query.productCode != null and query.productCode != ''">
+                AND pd.product_code = #{query.productCode}
+            </if>
+            <if test="query.batchNo != null and query.batchNo != ''">
+                AND p.batch_no = #{query.batchNo}
+            </if>
+            <if test="query.planType != null and query.planType != ''">
+                AND p.plan_type = #{query.planType}
+            </if>
+            <if test="query.status != null and query.status != ''">
+                AND p.status = #{query.status}
+            </if>
+            <if test="query.inspector != null and query.inspector != ''">
+                AND p.inspector = #{query.inspector}
+            </if>
+            <if test="query.planDateStart != null">
+                AND p.plan_date >= #{query.planDateStart}
+            </if>
+            <if test="query.planDateEnd != null">
+                AND p.plan_date &lt;= #{query.planDateEnd}
+            </if>
+            <if test="query.createTimeStart != null">
+                AND p.create_time >= #{query.createTimeStart}
+            </if>
+            <if test="query.createTimeEnd != null">
+                AND p.create_time &lt;= #{query.createTimeEnd}
+            </if>
+        </where>
+        ORDER BY p.create_time DESC
+    </select>
+
+    <!-- 根据计划编号查询 -->
+    <select id="selectByPlanNo" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List" />
+        FROM mes_quality_plan
+        WHERE plan_no = #{planNo}
+        AND status != 'DELETED'
+    </select>
+
+    <!-- 根据产品ID查询检验计划 -->
+    <select id="selectByProductId" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List" />
+        FROM mes_quality_plan
+        WHERE product_id = #{productId}
+        <if test="status != null and status != ''">
+            AND status = #{status}
+        </if>
+        AND status != 'DELETED'
+        ORDER BY create_time DESC
+    </select>
+
+    <!-- 根据状态统计计划数量 -->
+    <select id="countByStatus" resultType="java.util.HashMap">
+        SELECT
+        status,
+        COUNT(1) AS count
+        FROM mes_quality_plan
+        <where>
+            status != 'DELETED'
+            <if test="startDate != null and startDate != ''">
+                AND DATE(create_time) >= #{startDate}
+            </if>
+            <if test="endDate != null and endDate != ''">
+                AND DATE(create_time) &lt;= #{endDate}
+            </if>
+        </where>
+        GROUP BY status
+    </select>
+
+    <!-- 获取月度趋势 -->
+    <select id="getMonthlyTrend" resultType="java.util.HashMap">
+        SELECT
+        DATE_FORMAT(create_time, '%Y-%m') AS month,
+        COUNT(1) AS plan_count,
+        SUM(CASE WHEN status = 'COMPLETED' THEN 1 ELSE 0 END) AS completed_count
+        FROM mes_quality_plan
+        <where>
+            status != 'DELETED'
+            <if test="startDate != null and startDate != ''">
+                AND DATE(create_time) >= #{startDate}
+            </if>
+            <if test="endDate != null and endDate != ''">
+                AND DATE(create_time) &lt;= #{endDate}
+            </if>
+        </where>
+        GROUP BY DATE_FORMAT(create_time, '%Y-%m')
+        ORDER BY month ASC
+    </select>
+
+    <!-- 获取产品统计 -->
+    <select id="getProductStatistics" resultType="java.util.HashMap">
+        SELECT
+        pd.product_code,
+        pd.product_name,
+        COUNT(p.id) AS plan_count,
+        SUM(CASE WHEN p.status = 'COMPLETED' THEN 1 ELSE 0 END) AS completed_count
+        FROM mes_quality_plan p
+        LEFT JOIN mes_product_definition pd ON p.product_id = pd.id
+        <where>
+            p.status != 'DELETED'
+            <if test="startDate != null and startDate != ''">
+                AND DATE(p.create_time) >= #{startDate}
+            </if>
+            <if test="endDate != null and endDate != ''">
+                AND DATE(p.create_time) &lt;= #{endDate}
+            </if>
+        </where>
+        GROUP BY pd.product_code, pd.product_name
+        ORDER BY plan_count DESC
+    </select>
+
+    <!-- 查询当天需要执行的计划 -->
+    <select id="getPlansForToday" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List" />
+        FROM mes_quality_plan
+        WHERE DATE(plan_date) = #{today}
+        AND status = 'APPROVED'
+        AND (frequency = 'DAILY' OR frequency IS NULL)
+    </select>
+
+    <!-- 更新计划状态 -->
+    <update id="updatePlanStatus">
+        UPDATE mes_quality_plan
+        SET status = #{status},
+            update_by = #{updateBy},
+            update_time = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <!-- 批量更新计划状态 -->
+    <update id="updateBatchStatus">
+        UPDATE mes_quality_plan
+        SET status = #{status},
+        update_by = #{updateBy},
+        update_time = NOW()
+        WHERE id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </update>
+
+</mapper>

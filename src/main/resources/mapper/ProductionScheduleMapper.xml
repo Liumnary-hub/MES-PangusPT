@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.mes.mapper.ProductionScheduleMapper">
+
+    <select id="selectSchedulePage" resultType="com.mes.entity.ProductionSchedule">
+        SELECT *
+        FROM mes_production_schedule
+        WHERE is_deleted = 0
+        <if test="scheduleCode != null and scheduleCode != ''">
+            AND schedule_code LIKE CONCAT('%', #{scheduleCode}, '%')
+        </if>
+        <if test="scheduleName != null and scheduleName != ''">
+            AND schedule_name LIKE CONCAT('%', #{scheduleName}, '%')
+        </if>
+        <if test="scheduleDate != null">
+            AND schedule_date = #{scheduleDate}
+        </if>
+        <if test="scheduleType != null and scheduleType != ''">
+            AND schedule_type = #{scheduleType}
+        </if>
+        <if test="status != null and status != ''">
+            AND status = #{status}
+        </if>
+        ORDER BY create_time DESC
+    </select>
+
+    <select id="selectByDateRange" resultType="com.mes.entity.ProductionSchedule">
+        SELECT *
+        FROM mes_production_schedule
+        WHERE is_deleted = 0
+          AND schedule_date BETWEEN #{startDate} AND #{endDate}
+        ORDER BY schedule_date ASC, create_time DESC
+    </select>
+
+    <update id="updateStatus">
+        UPDATE mes_production_schedule
+        SET status = #{status}, update_time = NOW()
+        WHERE id = #{id}
+    </update>
+
+</mapper>

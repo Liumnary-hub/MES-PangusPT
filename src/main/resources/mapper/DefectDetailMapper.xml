@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.mes.mapper.DefectDetailMapper">
+
+    <resultMap id="BaseResultMap" type="com.mes.entity.DefectDetail">
+        <id column="id" property="id" />
+        <result column="task_id" property="taskId" />
+        <result column="record_id" property="recordId" />
+        <result column="defect_code" property="defectCode" />
+        <result column="defect_name" property="defectName" />
+        <result column="severity" property="severity" />
+        <result column="defect_quantity" property="defectQuantity" />
+        <result column="description" property="description" />
+        <result column="handling_method" property="handlingMethod" />
+        <result column="remark" property="remark" />
+        <result column="create_time" property="createTime" />
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id, task_id, record_id, defect_code, defect_name, severity,
+        defect_quantity, description, handling_method, remark, create_time
+    </sql>
+
+    <!-- 根据任务ID查询缺陷明细 -->
+    <select id="selectByTaskId" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List" />
+        FROM mes_defect_detail
+        WHERE task_id = #{taskId}
+        ORDER BY create_time DESC
+    </select>
+
+    <!-- 根据记录ID查询缺陷明细 -->
+    <select id="selectByRecordId" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List" />
+        FROM mes_defect_detail
+        WHERE record_id = #{recordId}
+    </select>
+
+    <!-- 获取缺陷TOP N -->
+    <select id="getTopDefects" resultType="java.util.HashMap">
+        SELECT
+            dd.defect_code,
+            dc.defect_name,
+            dc.defect_type,
+            COUNT(dd.id) AS defect_count,
+            SUM(dd.defect_quantity) AS total_quantity
+        FROM mes_defect_detail dd
+                 JOIN mes_defect_code dc ON dd.defect_code = dc.defect_code
+        GROUP BY dd.defect_code, dc.defect_name, dc.defect_type
+        ORDER BY defect_count DESC
+            LIMIT #{limit}
+    </select>
+
+    <!-- 获取缺陷类型分布 -->
+    <select id="getDefectTypeDistribution" resultType="java.util.HashMap">
+        SELECT
+        dc.defect_type,
+        COUNT(dd.id) AS defect_count,
+        SUM(dd.defect_quantity) AS total_quantity
+        FROM mes_defect_detail dd
+        JOIN mes_defect_code dc ON dd.defect_code = dc.defect_code
+        JOIN mes_quality_task t ON dd.task_id = t.id
+        <where>
+            <if test="startDate != null and startDate != ''">
+                AND DATE(t.create_time) >= #{startDate}
+            </if>
+            <if test="endDate != null and endDate != ''">
+                AND DATE(t.create_time) &lt;= #{endDate}
+            </if>
+        </where>
+        GROUP BY dc.defect_type
+        ORDER BY defect_count DESC
+    </select>
+
+    <!-- 获取帕累托分析数据 -->
+    <select id="getDefectForPareto" resultType="java.util.HashMap">
+        SELECT
+        dd.defect_code,
+        dc.defect_name,
+        dc.defect_type,
+        COUNT(dd.id) AS defect_count,
+        SUM(dd.defect_quantity) AS total_quantity
+        FROM mes_defect_detail dd
+        JOIN mes_defect_code dc ON dd.defect_code = dc.defect_code
+        JOIN mes_quality_task t ON dd.task_id = t.id
+        <where>
+            t.status = 'completed'
+            <if test="query.productCode != null and query.productCode != ''">
+                AND t.product_code = #{query.productCode}
+            </if>
+            <if test="query.startDate != null and query.startDate != ''">
+                AND DATE(t.create_time) >= #{query.startDate}
+            </if>
+            <if test="query.endDate != null and query.endDate != ''">
+                AND DATE(t.create_time) &lt;= #{query.endDate}
+            </if>
+        </where>
+        GROUP BY dd.defect_code, dc.defect_name, dc.defect_type
+        ORDER BY defect_count DESC
+    </select>
+
+    <!-- 根据任务ID删除缺陷明细 -->
+    <delete id="deleteByTaskId">
+        DELETE FROM mes_defect_detail
+        WHERE task_id = #{taskId}
+    </delete>
+
+    <!-- 批量插入缺陷明细 -->
+    <insert id="insertBatch" parameterType="java.util.List">
+        INSERT INTO mes_defect_detail (
+        task_id, record_id, defect_code, defect_name, severity,
+        defect_quantity, description, handling_method, remark, create_time
+        ) VALUES
+        <foreach collection="defects" item="defect" separator=",">
+            (
+            #{defect.taskId}, #{defect.recordId}, #{defect.defectCode},
+            #{defect.defectName}, #{defect.severity}, #{defect.defectQuantity},
+            #{defect.description}, #{defect.handlingMethod}, #{defect.remark},
+            #{defect.createTime}
+            )
+        </foreach>
+    </insert>
+
+</mapper>

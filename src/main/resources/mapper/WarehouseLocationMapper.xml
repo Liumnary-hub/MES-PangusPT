@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.mes.mapper.WarehouseLocationMapper">
+
+    <resultMap id="WarehouseLocationVOResultMap" type="com.mes.vo.WarehouseLocationVO">
+        <id column="id" property="id"/>
+        <result column="location_code" property="locationCode"/>
+        <result column="location_name" property="locationName"/>
+        <result column="warehouse_code" property="warehouseCode"/>
+        <result column="warehouse_name" property="warehouseName"/>
+        <result column="location_type" property="locationType"/>
+        <result column="capacity" property="capacity"/>
+        <result column="current_usage" property="currentUsage"/>
+        <result column="status" property="status"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+        <result column="create_user" property="createUser"/>
+        <result column="update_user" property="updateUser"/>
+        <!-- 计算字段 -->
+        <result column="usage_rate" property="usageRate"/>
+        <result column="usage_status" property="usageStatus"/>
+    </resultMap>
+
+    <!-- 添加分页查询方法 -->
+    <select id="selectLocationPage" resultMap="WarehouseLocationVOResultMap">
+        SELECT
+        wl.*,
+        w.warehouse_code,
+        w.warehouse_name,
+        CASE
+        WHEN wl.capacity > 0 THEN
+        ROUND((wl.current_usage / wl.capacity) * 100, 2)
+        ELSE 0
+        END as usage_rate,
+        CASE
+        WHEN wl.capacity = 0 THEN 'empty'
+        WHEN (wl.current_usage / wl.capacity) &lt;= 0.3 THEN 'idle'
+        WHEN (wl.current_usage / wl.capacity) &lt;= 0.7 THEN 'normal'
+        WHEN (wl.current_usage / wl.capacity) &lt; 1 THEN 'crowded'
+        ELSE 'full'
+        END as usage_status
+        FROM mes_warehouse_location wl
+        LEFT JOIN mes_warehouse w ON wl.warehouse_id = w.id
+        WHERE wl.is_deleted = 0
+        <if test="queryVO.locationCode != null and queryVO.locationCode != ''">
+            AND wl.location_code LIKE CONCAT('%', #{queryVO.locationCode}, '%')
+        </if>
+        <if test="queryVO.locationName != null and queryVO.locationName != ''">
+            AND wl.location_name LIKE CONCAT('%', #{queryVO.locationName}, '%')
+        </if>
+        <if test="queryVO.warehouseCode != null and queryVO.warehouseCode != ''">
+            AND w.warehouse_code LIKE CONCAT('%', #{queryVO.warehouseCode}, '%')
+        </if>
+        <if test="queryVO.warehouseName != null and queryVO.warehouseName != ''">
+            AND w.warehouse_name LIKE CONCAT('%', #{queryVO.warehouseName}, '%')
+        </if>
+        <if test="queryVO.locationType != null and queryVO.locationType != ''">
+            AND wl.location_type = #{queryVO.locationType}
+        </if>
+        <if test="queryVO.status != null and queryVO.status != ''">
+            AND wl.status = #{queryVO.status}
+        </if>
+        ORDER BY wl.create_time DESC
+    </select>
+
+</mapper>

@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.mes.mapper.MaterialMapper">
+
+    <resultMap id="MaterialVOResultMap" type="com.mes.vo.MaterialVO">
+        <id column="id" property="id"/>
+        <result column="material_code" property="materialCode"/>
+        <result column="material_name" property="materialName"/>
+        <result column="material_type" property="materialType"/>
+        <result column="specification" property="specification"/>
+        <result column="unit" property="unit"/>
+        <result column="safety_stock" property="safetyStock"/>
+        <result column="max_stock" property="maxStock"/>
+        <result column="min_stock" property="minStock"/>
+        <result column="status" property="status"/>
+        <result column="supplier_code" property="supplierCode"/>
+        <result column="storage_condition" property="storageCondition"/>
+        <result column="shelf_life" property="shelfLife"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+        <result column="create_user" property="createUser"/>
+        <result column="update_user" property="updateUser"/>
+    </resultMap>
+
+    <select id="selectMaterialPage" resultMap="MaterialVOResultMap">
+        SELECT
+        id,
+        material_code,
+        material_name,
+        material_type,
+        specification,
+        unit,
+        safety_stock as safetyStock,  <!-- 明确指定别名 -->
+        max_stock as maxStock,        <!-- 明确指定别名 -->
+        min_stock as minStock,        <!-- 明确指定别名 -->
+        status,
+        supplier_code,
+        storage_condition,
+        shelf_life,
+        create_time,
+        update_time,
+        create_user,
+        update_user
+        FROM mes_material
+        WHERE is_deleted = 0
+        <if test="vo.materialCode != null and vo.materialCode != ''">
+            AND material_code LIKE CONCAT('%', #{vo.materialCode}, '%')
+        </if>
+        <if test="vo.materialName != null and vo.materialName != ''">
+            AND material_name LIKE CONCAT('%', #{vo.materialName}, '%')
+        </if>
+        <if test="vo.materialType != null and vo.materialType != ''">
+            AND material_type = #{vo.materialType}
+        </if>
+        <if test="vo.status != null and vo.status != ''">
+            AND status = #{vo.status}
+        </if>
+        ORDER BY create_time DESC
+    </select>
+
+    <select id="selectMaterialList" resultMap="MaterialVOResultMap">
+        SELECT
+        id,
+        material_code,
+        material_name,
+        material_type,
+        specification,
+        unit,
+        safety_stock as safetyStock,  <!-- 明确指定别名 -->
+        max_stock as maxStock,        <!-- 明确指定别名 -->
+        min_stock as minStock,        <!-- 明确指定别名 -->
+        status,
+        supplier_code,
+        storage_condition,
+        shelf_life,
+        create_time,
+        update_time,
+        create_user,
+        update_user
+        FROM mes_material
+        WHERE is_deleted = 0
+        <if test="vo.materialCode != null and vo.materialCode != ''">
+            AND material_code LIKE CONCAT('%', #{vo.materialCode}, '%')
+        </if>
+        <if test="vo.materialName != null and vo.materialName != ''">
+            AND material_name LIKE CONCAT('%', #{vo.materialName}, '%')
+        </if>
+        <if test="vo.materialType != null and vo.materialType != ''">
+            AND material_type = #{vo.materialType}
+        </if>
+        <if test="vo.status != null and vo.status != ''">
+            AND status = #{vo.status}
+        </if>
+        ORDER BY create_time DESC
+    </select>
+
+</mapper>

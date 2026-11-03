@@ -1,0 +1,269 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.mes.mapper.EquipmentMapper">
+
+    <resultMap id="BaseResultMap" type="com.mes.entity.Equipment">
+        <id column="equipment_id" property="equipmentId" />
+        <result column="equipment_code" property="equipmentCode" />
+        <result column="equipment_name" property="equipmentName" />
+        <result column="equipment_type" property="equipmentType" />
+        <result column="status" property="status" />
+        <result column="workshop" property="workshop" />
+        <result column="location" property="location" />
+        <result column="model" property="model" />
+        <result column="specification" property="specification" />
+        <result column="supplier" property="supplier" />
+        <result column="manufacturer" property="manufacturer" />
+        <result column="purchase_date" property="purchaseDate" />
+        <result column="commissioning_date" property="commissioningDate" />
+        <result column="responsible_person" property="responsiblePerson" />
+        <result column="responsible_person_id" property="responsiblePersonId" />
+        <result column="contact_phone" property="contactPhone" />
+        <result column="is_critical" property="isCritical" />
+        <result column="maintenance_cycle" property="maintenanceCycle" />
+        <result column="last_maintenance_date" property="lastMaintenanceDate" />
+        <result column="next_maintenance_date" property="nextMaintenanceDate" />
+        <result column="total_running_hours" property="totalRunningHours" />
+        <result column="original_value" property="originalValue" />
+        <result column="net_value" property="netValue" />
+        <result column="qr_code" property="qrCode" />
+        <result column="technical_params" property="technicalParams" />
+        <result column="remark" property="remark" />
+        <result column="is_active" property="isActive" />
+        <result column="create_time" property="createTime" />
+        <result column="create_by" property="createBy" />
+        <result column="update_time" property="updateTime" />
+        <result column="update_by" property="updateBy" />
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        equipment_id, equipment_code, equipment_name, equipment_type, status, workshop,
+        location, model, specification, supplier, manufacturer, purchase_date, commissioning_date,
+        responsible_person, responsible_person_id, contact_phone, is_critical, maintenance_cycle,
+        last_maintenance_date, next_maintenance_date, total_running_hours, original_value, net_value,
+        qr_code, technical_params, remark, is_active, create_time, create_by, update_time, update_by
+    </sql>
+
+    <!-- 根据设备编码查询 -->
+    <select id="selectByEquipmentCode" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List" />
+        FROM mes_equipment
+        WHERE equipment_code = #{equipmentCode} AND is_active = 1
+    </select>
+
+    <!-- 根据车间查询 -->
+    <select id="selectByWorkshop" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List" />
+        FROM mes_equipment
+        WHERE workshop = #{workshop} AND is_active = 1
+        ORDER BY equipment_code
+    </select>
+
+    <!-- 根据状态查询 -->
+    <select id="selectByStatus" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List" />
+        FROM mes_equipment
+        WHERE status = #{status} AND is_active = 1
+        ORDER BY update_time DESC
+    </select>
+
+    <!-- 查询需要保养的设备 -->
+    <select id="selectNeedMaintenanceEquipments" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List" />
+        FROM mes_equipment
+        WHERE is_active = 1
+        AND (next_maintenance_date IS NULL OR next_maintenance_date &lt;= NOW())
+        AND status IN (1, 2) -- 运行中或待机中
+        ORDER BY next_maintenance_date ASC
+    </select>
+
+    <!-- 查询关键设备 -->
+    <select id="selectCriticalEquipments" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List" />
+        FROM mes_equipment
+        WHERE is_critical = 1 AND is_active = 1
+        ORDER BY equipment_code
+    </select>
+
+    <!-- 条件分页查询 -->
+    <select id="selectEquipmentPage" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List" />
+        FROM mes_equipment
+        WHERE is_active = 1
+        <if test="query.equipmentCode != null and query.equipmentCode != ''">
+            AND equipment_code LIKE CONCAT('%', #{query.equipmentCode}, '%')
+        </if>
+        <if test="query.equipmentName != null and query.equipmentName != ''">
+            AND equipment_name LIKE CONCAT('%', #{query.equipmentName}, '%')
+        </if>
+        <if test="query.equipmentType != null and query.equipmentType != ''">
+            AND equipment_type = #{query.equipmentType}
+        </if>
+        <if test="query.workshop != null and query.workshop != ''">
+            AND workshop = #{query.workshop}
+        </if>
+        <if test="query.status != null">
+            AND status = #{query.status}
+        </if>
+        <if test="query.isCritical != null">
+            AND is_critical = #{query.isCritical}
+        </if>
+        <if test="query.createStartTime != null">
+            AND create_time >= #{query.createStartTime}
+        </if>
+        <if test="query.createEndTime != null">
+            AND create_time &lt;= #{query.createEndTime}
+        </if>
+        ORDER BY
+        <choose>
+            <when test="query.sortField != null and query.sortField != ''">
+                ${query.sortField} ${query.sortOrder}
+            </when>
+            <otherwise>
+                create_time DESC
+            </otherwise>
+        </choose>
+    </select>
+
+    <!-- 根据设备类型统计 -->
+    <select id="countByEquipmentType" resultType="map">
+        SELECT
+            equipment_type as type,
+            COUNT(*) as count,
+            SUM(CASE WHEN status = 1 THEN 1 ELSE 0 END) as runningCount,
+            SUM(CASE WHEN status = 3 THEN 1 ELSE 0 END) as maintenanceCount
+        FROM mes_equipment
+        WHERE is_active = 1
+        GROUP BY equipment_type
+    </select>
+
+    <!-- 根据状态统计 -->
+    <select id="countByStatus" resultType="map">
+        SELECT
+            status,
+            COUNT(*) as count
+        FROM mes_equipment
+        WHERE is_active = 1
+        GROUP BY status
+    </select>
+
+    <!-- 根据车间统计 -->
+    <select id="countByWorkshop" resultType="map">
+        SELECT
+            workshop,
+            COUNT(*) as totalCount,
+            SUM(CASE WHEN is_critical = 1 THEN 1 ELSE 0 END) as criticalCount
+        FROM mes_equipment
+        WHERE is_active = 1 AND workshop IS NOT NULL
+        GROUP BY workshop
+    </select>
+
+    <!-- 更新设备状态 -->
+    <update id="updateEquipmentStatus">
+        UPDATE mes_equipment
+        SET
+            status = #{status},
+            update_time = #{updateTime},
+            update_by = #{updateBy}
+        WHERE equipment_id = #{equipmentId}
+    </update>
+
+    <!-- 更新设备保养信息 -->
+    <update id="updateMaintenanceInfo">
+        UPDATE mes_equipment
+        SET
+            last_maintenance_date = #{lastMaintenanceDate},
+            next_maintenance_date = #{nextMaintenanceDate},
+            total_running_hours = #{totalRunningHours},
+            update_time = NOW()
+        WHERE equipment_id = #{equipmentId}
+    </update>
+
+    <!-- 更新二维码 -->
+    <update id="updateQrCode">
+        UPDATE mes_equipment
+        SET
+            qr_code = #{qrCode},
+            update_time = NOW()
+        WHERE equipment_id = #{equipmentId}
+    </update>
+
+    <!-- 查询设备及其最近维护记录 -->
+    <select id="selectWithRecentMaintenance" resultMap="BaseResultMap">
+        SELECT
+            e.*,
+            mr.maintenance_no as recent_maintenance_no,
+            mr.record_type as recent_maintenance_type,
+            mr.actual_start_time as recent_maintenance_time
+        FROM mes_equipment e
+                 LEFT JOIN mes_maintenance_record mr ON e.equipment_id = mr.equipment_id
+        WHERE e.equipment_id = #{equipmentId}
+        ORDER BY mr.actual_start_time DESC
+            LIMIT 1
+    </select>
+
+    <!-- 批量更新状态 -->
+    <update id="batchUpdateStatus">
+        UPDATE mes_equipment
+        SET
+        status = #{status},
+        update_time = NOW(),
+        update_by = #{updateBy}
+        WHERE equipment_id IN
+        <foreach collection="equipmentIds" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </update>
+
+    <!-- 批量插入 -->
+    <insert id="insertBatch">
+        INSERT INTO mes_equipment (
+        equipment_code, equipment_name, equipment_type, status, workshop, location,
+        model, specification, supplier, manufacturer, purchase_date, commissioning_date,
+        responsible_person, responsible_person_id, contact_phone, is_critical, maintenance_cycle,
+        last_maintenance_date, next_maintenance_date, total_running_hours, original_value, net_value,
+        qr_code, technical_params, remark, is_active, create_time, create_by, update_time, update_by
+        ) VALUES
+        <foreach collection="list" item="item" separator=",">
+            (
+            #{item.equipmentCode}, #{item.equipmentName}, #{item.equipmentType}, #{item.status},
+            #{item.workshop}, #{item.location}, #{item.model}, #{item.specification},
+            #{item.supplier}, #{item.manufacturer}, #{item.purchaseDate}, #{item.commissioningDate},
+            #{item.responsiblePerson}, #{item.responsiblePersonId}, #{item.contactPhone},
+            #{item.isCritical}, #{item.maintenanceCycle}, #{item.lastMaintenanceDate},
+            #{item.nextMaintenanceDate}, #{item.totalRunningHours}, #{item.originalValue},
+            #{item.netValue}, #{item.qrCode}, #{item.technicalParams}, #{item.remark},
+            #{item.isActive}, #{item.createTime}, #{item.createBy}, #{item.updateTime}, #{item.updateBy}
+            )
+        </foreach>
+    </insert>
+
+    <!-- 逻辑删除 -->
+    <update id="deleteLogic">
+        UPDATE mes_equipment
+        SET
+            is_active = 0,
+            update_time = NOW()
+        WHERE equipment_id = #{id}
+    </update>
+
+    <!-- 批量逻辑删除 -->
+    <update id="deleteLogicBatch">
+        UPDATE mes_equipment
+        SET
+        is_active = 0,
+        update_time = NOW()
+        WHERE equipment_id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </update>
+
+</mapper>

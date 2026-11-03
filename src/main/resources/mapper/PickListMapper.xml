@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.mes.mapper.PickListMapper">
+
+    <resultMap id="PickListVOResultMap" type="com.mes.vo.PickListVO">
+        <id column="id" property="id"/>
+        <result column="pick_list_code" property="pickListCode"/>
+        <result column="work_order_id" property="workOrderId"/>
+        <result column="work_order_code" property="workOrderCode"/>
+        <result column="task_id" property="taskId"/>
+        <result column="task_code" property="taskCode"/>
+        <result column="status" property="status"/>
+        <result column="picker_id" property="pickerId"/>
+        <result column="picker_name" property="pickerName"/>
+        <result column="pick_time" property="pickTime"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+        <result column="create_user" property="createUser"/>
+        <result column="update_user" property="updateUser"/>
+        <!-- 关联字段 -->
+        <result column="product_name" property="productName"/>
+        <result column="planned_quantity" property="plannedQuantity"/>
+    </resultMap>
+
+    <select id="selectPickListPage" resultMap="PickListVOResultMap">
+        SELECT
+        pl.*,
+        po.planned_quantity,
+        pd.product_name
+        FROM mes_pick_list pl
+        LEFT JOIN mes_production_order po ON pl.work_order_id = po.id
+        LEFT JOIN mes_product_definition pd ON po.product_id = pd.id
+        WHERE pl.is_deleted = 0
+        <if test="vo.pickListCode != null and vo.pickListCode != ''">
+            AND pl.pick_list_code LIKE CONCAT('%', #{vo.pickListCode}, '%')
+        </if>
+        <if test="vo.workOrderCode != null and vo.workOrderCode != ''">
+            AND pl.work_order_code LIKE CONCAT('%', #{vo.workOrderCode}, '%')
+        </if>
+        <if test="vo.status != null and vo.status != ''">
+            AND pl.status = #{vo.status}
+        </if>
+        <if test="vo.workOrderId != null">
+            AND pl.work_order_id = #{vo.workOrderId}
+        </if>
+        ORDER BY pl.create_time DESC
+    </select>
+
+</mapper>

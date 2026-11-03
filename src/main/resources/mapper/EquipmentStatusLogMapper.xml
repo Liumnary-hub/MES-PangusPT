@@ -1,0 +1,471 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.mes.mapper.EquipmentStatusLogMapper">
+
+    <!-- 基础结果映射 -->
+    <resultMap id="BaseResultMap" type="com.mes.entity.EquipmentStatusLog">
+        <id column="log_id" property="logId" />
+        <result column="equipment_id" property="equipmentId" />
+        <result column="log_type" property="logType" />
+        <result column="record_time" property="recordTime" />
+        <result column="recorder" property="recorder" />
+        <result column="status" property="status" />
+        <result column="running_params" property="runningParams" />
+        <result column="alarm_info" property="alarmInfo" />
+        <result column="alarm_code" property="alarmCode" />
+        <result column="alarm_level" property="alarmLevel" />
+        <result column="inspection_result" property="inspectionResult" />
+        <result column="inspection_qualified" property="inspectionQualified" />
+        <result column="inspector" property="inspector" />
+        <result column="output_count" property="outputCount" />
+        <result column="good_count" property="goodCount" />
+        <result column="defect_count" property="defectCount" />
+        <result column="running_hours" property="runningHours" />
+        <result column="energy_consumption" property="energyConsumption" />
+        <result column="operator" property="operator" />
+        <result column="shift" property="shift" />
+        <result column="remark" property="remark" />
+        <result column="create_time" property="createTime" />
+    </resultMap>
+
+    <!-- 包含设备信息的扩展结果映射 -->
+    <resultMap id="DetailResultMap" type="com.mes.entity.EquipmentStatusLog" extends="BaseResultMap">
+        <association property="equipmentId" javaType="com.mes.entity.Equipment">
+            <id column="e_equipment_id" property="equipmentId" />
+            <result column="e_equipment_code" property="equipmentCode" />
+            <result column="e_equipment_name" property="equipmentName" />
+            <result column="e_equipment_type" property="equipmentType" />
+            <result column="e_workshop" property="workshop" />
+            <result column="e_location" property="location" />
+        </association>
+    </resultMap>
+
+    <!-- 基础列名 -->
+    <sql id="Base_Column_List">
+        log_id, equipment_id, log_type, record_time, recorder, status, running_params,
+        alarm_info, alarm_code, alarm_level, inspection_result, inspection_qualified,
+        inspector, output_count, good_count, defect_count, running_hours, energy_consumption,
+        operator, shift, remark, create_time
+    </sql>
+
+    <!-- 设备信息列名 -->
+    <sql id="Equipment_Column_List">
+        e.equipment_id as e_equipment_id,
+        e.equipment_code as e_equipment_code,
+        e.equipment_name as e_equipment_name,
+        e.equipment_type as e_equipment_type,
+        e.workshop as e_workshop,
+        e.location as e_location
+    </sql>
+
+    <!-- 根据设备ID查询状态日志 -->
+    <select id="selectByEquipmentId" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List" />
+        FROM mes_equipment_status_log
+        WHERE equipment_id = #{equipmentId}
+        ORDER BY record_time DESC
+        <if test="limit != null">
+            LIMIT #{limit}
+        </if>
+    </select>
+
+    <!-- 根据日志类型查询 -->
+    <select id="selectByLogType" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List" />
+        FROM mes_equipment_status_log
+        WHERE log_type = #{logType}
+        ORDER BY record_time DESC
+    </select>
+
+    <!-- 查询设备的最新状态 -->
+    <select id="selectLatestStatus" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List" />
+        FROM mes_equipment_status_log
+        WHERE equipment_id = #{equipmentId}
+        ORDER BY record_time DESC
+        LIMIT 1
+    </select>
+
+    <!-- 查询设备的历史状态变化 -->
+    <select id="selectStatusHistory" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List" />
+        FROM mes_equipment_status_log
+        WHERE equipment_id = #{equipmentId}
+        AND log_type = 1  <!-- 状态变更类型 -->
+        <if test="startTime != null">
+            AND record_time >= #{startTime}
+        </if>
+        <if test="endTime != null">
+            AND record_time &lt;= #{endTime}
+        </if>
+        ORDER BY record_time DESC
+    </select>
+
+    <!-- 查询设备的报警记录 -->
+    <select id="selectAlarmLogs" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List" />
+        FROM mes_equipment_status_log
+        WHERE equipment_id = #{equipmentId}
+        AND log_type = 4  <!-- 报警记录类型 -->
+        AND alarm_code IS NOT NULL
+        ORDER BY record_time DESC
+        <if test="limit != null">
+            LIMIT #{limit}
+        </if>
+    </select>
+
+    <!-- 查询设备的点检记录 -->
+    <select id="selectInspectionLogs" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List" />
+        FROM mes_equipment_status_log
+        WHERE equipment_id = #{equipmentId}
+        AND log_type = 3  <!-- 点检记录类型 -->
+        ORDER BY record_time DESC
+    </select>
+
+    <!-- 条件分页查询状态日志 -->
+    <select id="selectStatusLogPage" resultMap="DetailResultMap">
+        SELECT
+        l.*,
+        <include refid="Equipment_Column_List" />
+        FROM mes_equipment_status_log l
+        LEFT JOIN mes_equipment e ON l.equipment_id = e.equipment_id
+        WHERE 1=1
+        <if test="query.equipmentId != null">
+            AND l.equipment_id = #{query.equipmentId}
+        </if>
+        <if test="query.equipmentCode != null and query.equipmentCode != ''">
+            AND e.equipment_code = #{query.equipmentCode}
+        </if>
+        <if test="query.equipmentName != null and query.equipmentName != ''">
+            AND e.equipment_name LIKE CONCAT('%', #{query.equipmentName}, '%')
+        </if>
+        <if test="query.logType != null">
+            AND l.log_type = #{query.logType}
+        </if>
+        <if test="query.status != null">
+            AND l.status = #{query.status}
+        </if>
+        <if test="query.recordTimeStart != null">
+            AND l.record_time >= #{query.recordTimeStart}
+        </if>
+        <if test="query.recordTimeEnd != null">
+            AND l.record_time &lt;= #{query.recordTimeEnd}
+        </if>
+        <if test="query.recorder != null and query.recorder != ''">
+            AND l.recorder LIKE CONCAT('%', #{query.recorder}, '%')
+        </if>
+        <if test="query.alarmCode != null and query.alarmCode != ''">
+            AND l.alarm_code = #{query.alarmCode}
+        </if>
+        <if test="query.alarmLevel != null">
+            AND l.alarm_level = #{query.alarmLevel}
+        </if>
+        <if test="query.minAlarmLevel != null">
+            AND l.alarm_level >= #{query.minAlarmLevel}
+        </if>
+        <if test="query.maxAlarmLevel != null">
+            AND l.alarm_level &lt;= #{query.maxAlarmLevel}
+        </if>
+        <if test="query.alarmKeyword != null and query.alarmKeyword != ''">
+            AND l.alarm_info LIKE CONCAT('%', #{query.alarmKeyword}, '%')
+        </if>
+        <if test="query.inspectionQualified != null">
+            AND l.inspection_qualified = #{query.inspectionQualified}
+        </if>
+        <if test="query.inspector != null and query.inspector != ''">
+            AND l.inspector LIKE CONCAT('%', #{query.inspector}, '%')
+        </if>
+        <if test="query.operator != null and query.operator != ''">
+            AND l.operator = #{query.operator}
+        </if>
+        <if test="query.shift != null and query.shift != ''">
+            AND l.shift = #{query.shift}
+        </if>
+        <if test="query.workshop != null and query.workshop != ''">
+            AND e.workshop = #{query.workshop}
+        </if>
+        <if test="query.equipmentType != null and query.equipmentType != ''">
+            AND e.equipment_type = #{query.equipmentType}
+        </if>
+        <!-- 特殊查询模式 -->
+        <if test="query.alarmOnly != null and query.alarmOnly">
+            AND l.log_type = 4
+        </if>
+        <if test="query.inspectionOnly != null and query.inspectionOnly">
+            AND l.log_type = 3
+        </if>
+        <if test="query.statusChangeOnly != null and query.statusChangeOnly">
+            AND l.log_type = 1
+        </if>
+        <!-- 关键词搜索 -->
+        <if test="query.keyword != null and query.keyword != ''">
+            AND (
+            l.alarm_info LIKE CONCAT('%', #{query.keyword}, '%')
+            OR l.remark LIKE CONCAT('%', #{query.keyword}, '%')
+            OR e.equipment_code LIKE CONCAT('%', #{query.keyword}, '%')
+            OR e.equipment_name LIKE CONCAT('%', #{query.keyword}, '%')
+            )
+        </if>
+        ORDER BY
+        <choose>
+            <when test="query.sortField != null and query.sortField != ''">
+                l.${query.sortField} ${query.sortOrder}
+            </when>
+            <otherwise>
+                l.record_time DESC
+            </otherwise>
+        </choose>
+    </select>
+
+    <!-- 统计设备运行时长 -->
+    <select id="sumRunningHours" resultType="java.util.Map">
+        SELECT
+        equipment_id,
+        SUM(running_hours) as total_running_hours,
+        COUNT(*) as log_count
+        FROM mes_equipment_status_log
+        WHERE equipment_id = #{equipmentId}
+        <if test="startTime != null">
+            AND record_time >= #{startTime}
+        </if>
+        <if test="endTime != null">
+            AND record_time &lt;= #{endTime}
+        </if>
+        AND log_type IN (1, 2)  <!-- 状态变更和运行参数日志 -->
+        GROUP BY equipment_id
+    </select>
+
+    <!-- 统计设备停机时长 -->
+    <select id="sumDowntimeHours" resultType="java.util.Map">
+        SELECT
+        equipment_id,
+        SUM(running_hours) as total_downtime_hours,
+        COUNT(*) as downtime_count
+        FROM mes_equipment_status_log
+        WHERE equipment_id = #{equipmentId}
+        <if test="startTime != null">
+            AND record_time >= #{startTime}
+        </if>
+        <if test="endTime != null">
+            AND record_time &lt;= #{endTime}
+        </if>
+        AND log_type = 1  <!-- 状态变更日志 -->
+        AND status = 5    <!-- 停机状态 -->
+        GROUP BY equipment_id
+    </select>
+
+    <!-- 统计设备产量 -->
+    <select id="sumOutput" resultType="java.util.Map">
+        SELECT
+        equipment_id,
+        SUM(output_count) as total_output,
+        SUM(good_count) as total_good_output,
+        SUM(defect_count) as total_defect_output
+        FROM mes_equipment_status_log
+        WHERE equipment_id = #{equipmentId}
+        <if test="startTime != null">
+            AND record_time >= #{startTime}
+        </if>
+        <if test="endTime != null">
+            AND record_time &lt;= #{endTime}
+        </if>
+        AND log_type = 5  <!-- 产量记录 -->
+        GROUP BY equipment_id
+    </select>
+
+    <!-- 统计设备能耗 -->
+    <select id="sumEnergyConsumption" resultType="java.util.Map">
+        SELECT
+        equipment_id,
+        SUM(energy_consumption) as total_energy_consumption,
+        AVG(energy_consumption) as avg_energy_consumption
+        FROM mes_equipment_status_log
+        WHERE equipment_id = #{equipmentId}
+        <if test="startTime != null">
+            AND record_time >= #{startTime}
+        </if>
+        <if test="endTime != null">
+            AND record_time &lt;= #{endTime}
+        </if>
+        AND log_type IN (2, 5)  <!-- 运行参数和产量记录 -->
+        AND energy_consumption IS NOT NULL
+        GROUP BY equipment_id
+    </select>
+
+    <!-- 统计设备运行效率(OEE) -->
+    <select id="calculateOEE" resultType="java.util.Map">
+        SELECT
+        equipment_id,
+        <!-- 时间开动率 = 运行时间 / 计划运行时间 -->
+        (SUM(CASE WHEN status = 1 THEN running_hours ELSE 0 END) /
+        NULLIF(SUM(CASE WHEN log_type IN (1,2) THEN running_hours ELSE 0 END), 0)) * 100 as availability_rate,
+        <!-- 性能开动率 = 理论生产周期时间 / 实际生产周期时间 -->
+        (SUM(CASE WHEN log_type = 5 THEN output_count ELSE 0 END) /
+        NULLIF(SUM(CASE WHEN status = 1 THEN running_hours ELSE 0 END), 0)) as performance_rate,
+        <!-- 合格品率 = 合格品数量 / 总产量 -->
+        (SUM(CASE WHEN log_type = 5 THEN good_count ELSE 0 END) /
+        NULLIF(SUM(CASE WHEN log_type = 5 THEN output_count ELSE 0 END), 0)) * 100 as quality_rate
+        FROM mes_equipment_status_log
+        WHERE equipment_id = #{equipmentId}
+        <if test="startTime != null">
+            AND record_time >= #{startTime}
+        </if>
+        <if test="endTime != null">
+            AND record_time &lt;= #{endTime}
+        </if>
+        GROUP BY equipment_id
+    </select>
+
+    <!-- 批量插入状态日志 -->
+    <insert id="insertBatchStatusLog">
+        INSERT INTO mes_equipment_status_log (
+        equipment_id, log_type, record_time, recorder, status, running_params,
+        alarm_info, alarm_code, alarm_level, inspection_result, inspection_qualified,
+        inspector, output_count, good_count, defect_count, running_hours,
+        energy_consumption, operator, shift, remark, create_time
+        ) VALUES
+        <foreach collection="list" item="log" separator=",">
+            (
+            #{log.equipmentId},
+            #{log.logType},
+            #{log.recordTime},
+            #{log.recorder},
+            #{log.status},
+            #{log.runningParams},
+            #{log.alarmInfo},
+            #{log.alarmCode},
+            #{log.alarmLevel},
+            #{log.inspectionResult},
+            #{log.inspectionQualified},
+            #{log.inspector},
+            #{log.outputCount},
+            #{log.goodCount},
+            #{log.defectCount},
+            #{log.runningHours},
+            #{log.energyConsumption},
+            #{log.operator},
+            #{log.shift},
+            #{log.remark},
+            #{log.createTime}
+            )
+        </foreach>
+    </insert>
+
+    <!-- 清理过期的日志数据 -->
+    <delete id="cleanExpiredLogs">
+        DELETE FROM mes_equipment_status_log
+        WHERE record_time &lt; DATE_SUB(NOW(), INTERVAL #{days} DAY)
+        <if test="logType != null">
+            AND log_type = #{logType}
+        </if>
+    </delete>
+
+    <!-- 查询设备运行统计（按小时） -->
+    <select id="selectHourlyStatistics" resultType="java.util.Map">
+        SELECT
+            DATE_FORMAT(record_time, '%Y-%m-%d %H:00:00') as hour_time,
+            SUM(CASE WHEN status = 1 THEN running_hours ELSE 0 END) as running_hours,
+            SUM(CASE WHEN status = 2 THEN running_hours ELSE 0 END) as idle_hours,
+            SUM(CASE WHEN status = 5 THEN running_hours ELSE 0 END) as downtime_hours,
+            SUM(output_count) as total_output,
+            SUM(good_count) as good_output,
+            SUM(defect_count) as defect_output,
+            COUNT(DISTINCT CASE WHEN alarm_code IS NOT NULL THEN alarm_code END) as alarm_count
+        FROM mes_equipment_status_log
+        WHERE equipment_id = #{equipmentId}
+          AND DATE(record_time) = #{date}
+        GROUP BY DATE_FORMAT(record_time, '%Y-%m-%d %H:00:00')
+        ORDER BY hour_time
+    </select>
+
+    <!-- 获取设备报警统计 -->
+    <select id="selectAlarmStatistics" resultType="java.util.Map">
+        SELECT
+        alarm_code,
+        alarm_info,
+        COUNT(*) as alarm_count,
+        MIN(record_time) as first_occurrence,
+        MAX(record_time) as last_occurrence,
+        GROUP_CONCAT(DISTINCT DATE(record_time) ORDER BY record_time DESC) as occurrence_dates
+        FROM mes_equipment_status_log
+        WHERE equipment_id = #{equipmentId}
+        AND alarm_code IS NOT NULL
+        <if test="startTime != null">
+            AND record_time >= #{startTime}
+        </if>
+        <if test="endTime != null">
+            AND record_time &lt;= #{endTime}
+        </if>
+        GROUP BY alarm_code, alarm_info
+        ORDER BY alarm_count DESC
+    </select>
+
+    <!-- 获取设备状态分布 -->
+    <select id="selectStatusDistribution" resultType="java.util.Map">
+        SELECT
+        status,
+        COUNT(*) as count,
+        SUM(running_hours) as total_hours,
+        (SUM(running_hours) / (SELECT SUM(running_hours) FROM mes_equipment_status_log
+        WHERE equipment_id = #{equipmentId}
+        <if test="startTime != null">
+            AND record_time >= #{startTime}
+        </if>
+        <if test="endTime != null">
+            AND record_time &lt;= #{endTime}
+        </if>)) * 100 as percentage
+        FROM mes_equipment_status_log
+        WHERE equipment_id = #{equipmentId}
+        <if test="startTime != null">
+            AND record_time >= #{startTime}
+        </if>
+        <if test="endTime != null">
+            AND record_time &lt;= #{endTime}
+        </if>
+        AND log_type = 1  <!-- 状态变更日志 -->
+        GROUP BY status
+        ORDER BY status
+    </select>
+
+    <!-- 获取设备运行趋势（按天） -->
+    <select id="selectDailyTrend" resultType="java.util.Map">
+        SELECT
+        DATE(record_time) as date,
+        SUM(CASE WHEN status = 1 THEN running_hours ELSE 0 END) as running_hours,
+        SUM(CASE WHEN status = 2 THEN running_hours ELSE 0 END) as idle_hours,
+        SUM(CASE WHEN status = 5 THEN running_hours ELSE 0 END) as downtime_hours,
+        SUM(output_count) as output,
+        SUM(good_count) as good_output,
+        SUM(energy_consumption) as energy_consumption,
+        COUNT(DISTINCT CASE WHEN alarm_code IS NOT NULL THEN alarm_code END) as alarm_count
+        FROM mes_equipment_status_log
+        WHERE equipment_id = #{equipmentId}
+        <if test="startTime != null">
+            AND record_time >= #{startTime}
+        </if>
+        <if test="endTime != null">
+            AND record_time &lt;= #{endTime}
+        </if>
+        GROUP BY DATE(record_time)
+        ORDER BY date
+    </select>
+
+    <!-- 批量逻辑删除 -->
+    <update id="deleteLogicBatch">
+        UPDATE mes_equipment_status_log
+        SET is_deleted = 1
+        WHERE log_id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </update>
+
+</mapper>

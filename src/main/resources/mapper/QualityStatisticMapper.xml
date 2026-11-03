@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.mes.mapper.QualityStatisticMapper">
+
+    <resultMap id="BaseResultMap" type="com.mes.entity.QualityStatistic">
+        <id column="id" property="id" />
+        <result column="statistic_date" property="statisticDate" />
+        <result column="product_code" property="productCode" />
+        <result column="product_name" property="productName" />
+        <result column="workshop_code" property="workshopCode" />
+        <result column="inspection_type" property="inspectionType" />
+        <result column="total_tasks" property="totalTasks" />
+        <result column="completed_tasks" property="completedTasks" />
+        <result column="total_checked" property="totalChecked" />
+        <result column="total_qualified" property="totalQualified" />
+        <result column="total_defective" property="totalDefective" />
+        <result column="pass_rate" property="passRate" />
+        <result column="defect_rate" property="defectRate" />
+        <result column="dpmo" property="dpmo" />
+        <result column="defect_distribution" property="defectDistribution" />
+        <result column="spc_data" property="spcData" />
+        <result column="create_time" property="createTime" />
+        <result column="update_time" property="updateTime" />
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id, statistic_date, product_code, product_name, workshop_code,
+        inspection_type, total_tasks, completed_tasks, total_checked,
+        total_qualified, total_defective, pass_rate, defect_rate, dpmo,
+        defect_distribution, spc_data, create_time, update_time
+    </sql>
+
+    <!-- 根据日期查询统计 -->
+    <select id="selectByDate" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List" />
+        FROM mes_quality_statistic
+        WHERE statistic_date = #{statisticDate}
+        <if test="productCode != null and productCode != ''">
+            AND product_code = #{productCode}
+        </if>
+    </select>
+
+    <!-- 查询统计列表 -->
+    <select id="selectStatisticList" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List" />
+        FROM mes_quality_statistic
+        <where>
+            <if test="statisticDate != null and statisticDate != ''">
+                AND statistic_date = #{statisticDate}
+            </if>
+            <if test="productCode != null and productCode != ''">
+                AND product_code = #{productCode}
+            </if>
+            <if test="startDate != null and startDate != ''">
+                AND statistic_date >= #{startDate}
+            </if>
+            <if test="endDate != null and endDate != ''">
+                AND statistic_date &lt;= #{endDate}
+            </if>
+        </where>
+        ORDER BY statistic_date DESC
+    </select>
+
+    <!-- 获取日期范围内的统计 -->
+    <select id="selectByDateRange" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List" />
+        FROM mes_quality_statistic
+        <where>
+            <if test="productCode != null and productCode != ''">
+                AND product_code = #{productCode}
+            </if>
+            <if test="startDate != null and startDate != ''">
+                AND statistic_date >= #{startDate}
+            </if>
+            <if test="endDate != null and endDate != ''">
+                AND statistic_date &lt;= #{endDate}
+            </if>
+        </where>
+        ORDER BY statistic_date ASC
+    </select>
+
+    <!-- 批量插入或更新统计 -->
+    <insert id="upsertBatch" parameterType="java.util.List">
+        INSERT INTO mes_quality_statistic (
+        statistic_date, product_code, product_name, workshop_code,
+        inspection_type, total_tasks, completed_tasks, total_checked,
+        total_qualified, total_defective, pass_rate, defect_rate, dpmo,
+        defect_distribution, spc_data, create_time, update_time
+        ) VALUES
+        <foreach collection="statistics" item="statistic" separator=",">
+            (
+            #{statistic.statisticDate}, #{statistic.productCode}, #{statistic.productName},
+            #{statistic.workshopCode}, #{statistic.inspectionType}, #{statistic.totalTasks},
+            #{statistic.completedTasks}, #{statistic.totalChecked}, #{statistic.totalQualified},
+            #{statistic.totalDefective}, #{statistic.passRate}, #{statistic.defectRate},
+            #{statistic.dpmo}, #{statistic.defectDistribution}, #{statistic.spcData},
+            #{statistic.createTime}, #{statistic.updateTime}
+            )
+        </foreach>
+        ON DUPLICATE KEY UPDATE
+        product_name = VALUES(product_name),
+        workshop_code = VALUES(workshop_code),
+        inspection_type = VALUES(inspection_type),
+        total_tasks = VALUES(total_tasks),
+        completed_tasks = VALUES(completed_tasks),
+        total_checked = VALUES(total_checked),
+        total_qualified = VALUES(total_qualified),
+        total_defective = VALUES(total_defective),
+        pass_rate = VALUES(pass_rate),
+        defect_rate = VALUES(defect_rate),
+        dpmo = VALUES(dpmo),
+        defect_distribution = VALUES(defect_distribution),
+        spc_data = VALUES(spc_data),
+        update_time = VALUES(update_time)
+    </insert>
+
+    <!-- 删除指定日期的统计 -->
+    <delete id="deleteByDate">
+        DELETE FROM mes_quality_statistic
+        WHERE statistic_date = #{statisticDate}
+    </delete>
+
+</mapper>

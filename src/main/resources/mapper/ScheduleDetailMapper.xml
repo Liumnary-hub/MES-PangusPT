@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.mes.mapper.ScheduleDetailMapper">
+
+    <select id="selectByScheduleId" resultType="com.mes.entity.ScheduleDetail">
+        SELECT sd.*,
+               o.order_code,
+               t.task_code,
+               r.resource_name,
+               t.operation_name
+        FROM mes_schedule_detail sd
+                 LEFT JOIN mes_production_order o ON sd.order_id = o.id
+                 LEFT JOIN mes_production_task t ON sd.task_id = t.id
+                 LEFT JOIN mes_production_resource r ON sd.resource_id = r.id
+        WHERE sd.schedule_id = #{scheduleId}
+          AND sd.is_deleted = 0
+        ORDER BY sd.operation_sequence ASC, sd.planned_start_time ASC
+    </select>
+
+    <select id="countResourceConflict" resultType="int">
+        SELECT COUNT(*)
+        FROM mes_schedule_detail
+        WHERE resource_id = #{resourceId}
+        AND is_deleted = 0
+        AND status IN ('SCHEDULED', 'IN_PROGRESS')
+        AND (
+        (planned_start_time <![CDATA[ < ]]> #{endTime} AND planned_end_time <![CDATA[ > ]]> #{startTime})
+        )
+        <if test="excludeDetailId != null">
+            AND id != #{excludeDetailId}
+        </if>
+    </select>
+
+    <insert id="batchInsert">
+        INSERT INTO mes_schedule_detail (
+        schedule_id, order_id, task_id, resource_id, operation_sequence,
+        planned_start_time, planned_end_time, duration, setup_time, teardown_time,
+        status, priority, constraint_type, predecessor_task_id, create_time, update_time
+        ) VALUES
+        <foreach collection="list" item="item" separator=",">
+            (
+            #{item.scheduleId}, #{item.orderId}, #{item.taskId}, #{item.resourceId}, #{item.operationSequence},
+            #{item.plannedStartTime}, #{item.plannedEndTime}, #{item.duration}, #{item.setupTime}, #{item.teardownTime},
+            #{item.status}, #{item.priority}, #{item.constraintType}, #{item.predecessorTaskId}, NOW(), NOW()
+            )
+        </foreach>
+    </insert>
+
+</mapper>

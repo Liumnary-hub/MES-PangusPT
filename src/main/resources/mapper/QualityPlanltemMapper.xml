@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.mes.mapper.QualityPlanItemMapper">
+
+    <resultMap id="BaseResultMap" type="com.mes.entity.QualityPlanItem">
+        <id column="id" property="id" />
+        <result column="plan_id" property="planId" />
+        <result column="standard_id" property="standardId" />
+        <result column="item_id" property="itemId" />
+        <result column="item_name" property="itemName" />
+        <result column="sequence" property="sequence" />
+        <result column="required" property="required" />
+        <result column="create_time" property="createTime" />
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id, plan_id, standard_id, item_id, item_name, sequence, required, create_time
+    </sql>
+
+    <!-- 根据计划ID查询明细 -->
+    <select id="selectByPlanId" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List" />
+        FROM mes_quality_plan_item
+        WHERE plan_id = #{planId}
+        ORDER BY sequence ASC
+    </select>
+
+    <!-- 根据计划ID删除明细 -->
+    <delete id="deleteByPlanId">
+        DELETE FROM mes_quality_plan_item
+        WHERE plan_id = #{planId}
+    </delete>
+
+    <!-- 批量插入明细 -->
+    <insert id="insertBatch" parameterType="java.util.List">
+        INSERT INTO mes_quality_plan_item (
+        plan_id, standard_id, item_id, item_name, sequence, required, create_time
+        ) VALUES
+        <foreach collection="items" item="item" separator=",">
+            (
+            #{item.planId}, #{item.standardId}, #{item.itemId}, #{item.itemName},
+            #{item.sequence}, #{item.required}, #{item.createTime}
+            )
+        </foreach>
+    </insert>
+
+    <!-- 根据计划ID和项目ID查询 -->
+    <select id="selectByPlanAndItem" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List" />
+        FROM mes_quality_plan_item
+        WHERE plan_id = #{planId}
+        AND item_id = #{itemId}
+    </select>
+
+</mapper>

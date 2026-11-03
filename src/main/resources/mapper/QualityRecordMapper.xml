@@ -1,0 +1,180 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.mes.mapper.QualityRecordMapper">
+
+    <resultMap id="BaseResultMap" type="com.mes.entity.QualityRecord">
+        <id column="id" property="id" />
+        <result column="task_id" property="taskId" />
+        <result column="plan_id" property="planId" />
+        <result column="item_id" property="itemId" />
+        <result column="item_code" property="itemCode" />
+        <result column="item_name" property="itemName" />
+        <result column="inspection_method" property="inspectionMethod" />
+        <result column="unit" property="unit" />
+        <result column="standard_value" property="standardValue" />
+        <result column="upper_limit" property="upperLimit" />
+        <result column="lower_limit" property="lowerLimit" />
+        <result column="actual_value" property="actualValue" />
+        <result column="result" property="result" />
+        <result column="defect_code" property="defectCode" />
+        <result column="defect_description" property="defectDescription" />
+        <result column="remark" property="remark" />
+        <result column="images" property="images" />
+        <result column="operator" property="operator" />
+        <result column="create_time" property="createTime" />
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id, task_id, plan_id, item_id, item_code, item_name, inspection_method,
+        unit, standard_value, upper_limit, lower_limit, actual_value, result,
+        defect_code, defect_description, remark, images, operator, create_time
+    </sql>
+
+    <!-- 分页查询检验记录列表 -->
+    <select id="selectRecordList" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List" />
+        FROM mes_quality_record
+        <where>
+            <if test="query.id != null">
+                AND id = #{query.id}
+            </if>
+            <if test="query.taskNo != null and query.taskNo != ''">
+                AND task_id IN (SELECT id FROM mes_quality_task WHERE task_no LIKE CONCAT('%', #{query.taskNo}, '%'))
+            </if>
+            <if test="query.planNo != null and query.planNo != ''">
+                AND plan_id IN (SELECT id FROM mes_quality_plan WHERE plan_no LIKE CONCAT('%', #{query.planNo}, '%'))
+            </if>
+            <if test="query.productCode != null and query.productCode != ''">
+                AND task_id IN (SELECT id FROM mes_quality_task WHERE product_code = #{query.productCode})
+            </if>
+            <if test="query.batchNo != null and query.batchNo != ''">
+                AND task_id IN (SELECT id FROM mes_quality_task WHERE batch_no = #{query.batchNo})
+            </if>
+            <if test="query.itemCode != null and query.itemCode != ''">
+                AND item_code = #{query.itemCode}
+            </if>
+            <if test="query.itemName != null and query.itemName != ''">
+                AND item_name LIKE CONCAT('%', #{query.itemName}, '%')
+            </if>
+            <if test="query.inspector != null and query.inspector != ''">
+                AND task_id IN (SELECT id FROM mes_quality_task WHERE inspector = #{query.inspector})
+            </if>
+            <if test="query.result != null and query.result != ''">
+                AND result = #{query.result}
+            </if>
+            <if test="query.defectCode != null and query.defectCode != ''">
+                AND defect_code = #{query.defectCode}
+            </if>
+            <if test="query.inspectionTimeStart != null">
+                AND create_time >= #{query.inspectionTimeStart}
+            </if>
+            <if test="query.inspectionTimeEnd != null">
+                AND create_time &lt;= #{query.inspectionTimeEnd}
+            </if>
+            <if test="query.dataType != null and query.dataType != ''">
+                AND item_id IN (SELECT id FROM mes_inspection_item WHERE data_type = #{query.dataType})
+            </if>
+            <if test="query.isCritical != null">
+                AND item_id IN (SELECT id FROM mes_inspection_item WHERE is_critical = #{query.isCritical})
+            </if>
+        </where>
+        ORDER BY create_time DESC
+    </select>
+
+    <!-- 根据任务ID查询检验记录 -->
+    <select id="selectByTaskId" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List" />
+        FROM mes_quality_record
+        WHERE task_id = #{taskId}
+        ORDER BY create_time ASC
+    </select>
+
+    <!-- 根据计划ID查询检验记录 -->
+    <select id="selectByPlanId" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List" />
+        FROM mes_quality_record
+        WHERE plan_id = #{planId}
+        ORDER BY create_time DESC
+    </select>
+
+    <!-- 获取SPC分析数据 -->
+    <select id="getRecordsForSPC" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List" />
+        FROM mes_quality_record
+        <where>
+            actual_value IS NOT NULL
+            <if test="query.itemId != null">
+                AND item_id = #{query.itemId}
+            </if>
+            <if test="query.itemCode != null and query.itemCode != ''">
+                AND item_code = #{query.itemCode}
+            </if>
+            <if test="query.productCode != null and query.productCode != ''">
+                AND task_id IN (
+                SELECT id FROM mes_quality_task
+                WHERE product_code = #{query.productCode}
+                )
+            </if>
+            <if test="query.startDate != null and query.startDate != ''">
+                AND DATE(create_time) >= #{query.startDate}
+            </if>
+            <if test="query.endDate != null and query.endDate != ''">
+                AND DATE(create_time) &lt;= #{query.endDate}
+            </if>
+        </where>
+        ORDER BY create_time ASC
+    </select>
+
+    <!-- 根据项目和日期范围查询记录 -->
+    <select id="selectByItemAndDateRange" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List" />
+        FROM mes_quality_record
+        WHERE item_id = #{itemId}
+        AND DATE(create_time) BETWEEN #{startDate} AND #{endDate}
+        AND actual_value IS NOT NULL
+        ORDER BY create_time ASC
+    </select>
+
+    <!-- 批量插入检验记录 -->
+    <insert id="insertBatch" parameterType="java.util.List">
+        INSERT INTO mes_quality_record (
+        task_id, plan_id, item_id, item_code, item_name, inspection_method,
+        unit, standard_value, upper_limit, lower_limit, actual_value, result,
+        defect_code, defect_description, remark, images, operator, create_time
+        ) VALUES
+        <foreach collection="records" item="record" separator=",">
+            (
+            #{record.taskId}, #{record.planId}, #{record.itemId}, #{record.itemCode},
+            #{record.itemName}, #{record.inspectionMethod}, #{record.unit},
+            #{record.standardValue}, #{record.upperLimit}, #{record.lowerLimit},
+            #{record.actualValue}, #{record.result}, #{record.defectCode},
+            #{record.defectDescription}, #{record.remark}, #{record.images},
+            #{record.operator}, #{record.createTime}
+            )
+        </foreach>
+    </insert>
+
+    <!-- 根据任务ID删除检验记录 -->
+    <delete id="deleteByTaskId">
+        DELETE FROM mes_quality_record
+        WHERE task_id = #{taskId}
+    </delete>
+
+    <!-- 获取检验数据统计 -->
+    <select id="getRecordStatistics" resultType="java.util.HashMap">
+        SELECT
+            COUNT(1) AS total_records,
+            SUM(CASE WHEN result = 'QUALIFIED' THEN 1 ELSE 0 END) AS qualified_count,
+            SUM(CASE WHEN result = 'DEFECTIVE' THEN 1 ELSE 0 END) AS defective_count,
+            GROUP_CONCAT(DISTINCT defect_code) AS defect_codes
+        FROM mes_quality_record
+        WHERE task_id = #{taskId}
+    </select>
+
+</mapper>

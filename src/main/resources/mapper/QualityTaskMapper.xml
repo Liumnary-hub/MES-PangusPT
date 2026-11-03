@@ -1,0 +1,443 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.mes.mapper.QualityTaskMapper">
+
+    <resultMap id="BaseResultMap" type="com.mes.entity.QualityTask">
+        <id column="id" property="id" />
+        <result column="task_no" property="taskNo" />
+        <result column="plan_id" property="planId" />
+        <result column="standard_id" property="standardId" />
+        <result column="product_code" property="productCode" />
+        <result column="product_name" property="productName" />
+        <result column="batch_no" property="batchNo" />
+        <result column="order_no" property="orderNo" />
+        <result column="workstation_code" property="workstationCode" />
+        <result column="inspector" property="inspector" />
+        <result column="inspection_date" property="inspectionDate" />
+        <result column="quantity_checked" property="quantityChecked" />
+        <result column="quantity_qualified" property="quantityQualified" />
+        <result column="quantity_defective" property="quantityDefective" />
+        <result column="result" property="result" />
+        <result column="status" property="status" />
+        <result column="inspection_type" property="inspectionType" />
+        <result column="remark" property="remark" />
+        <result column="create_time" property="createTime" />
+        <result column="complete_time" property="completeTime" />
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id, task_no, plan_id, standard_id, product_code, product_name,
+        batch_no, order_no, workstation_code, inspector, inspection_date,
+        quantity_checked, quantity_qualified, quantity_defective, result,
+        status, inspection_type, remark, create_time, complete_time
+    </sql>
+
+    <!-- 分页查询检验任务 -->
+    <select id="selectTaskList" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List" />
+        FROM mes_quality_task
+        <where>
+            <if test="param.taskNo != null and param.taskNo != ''">
+                AND task_no LIKE CONCAT('%', #{param.taskNo}, '%')
+            </if>
+            <if test="param.productCode != null and param.productCode != ''">
+                AND product_code = #{param.productCode}
+            </if>
+            <if test="param.productName != null and param.productName != ''">
+                AND product_name LIKE CONCAT('%', #{param.productName}, '%')
+            </if>
+            <if test="param.batchNo != null and param.batchNo != ''">
+                AND batch_no = #{param.batchNo}
+            </if>
+            <if test="param.orderNo != null and param.orderNo != ''">
+                AND order_no = #{param.orderNo}
+            </if>
+            <if test="param.workstationCode != null and param.workstationCode != ''">
+                AND workstation_code = #{param.workstationCode}
+            </if>
+            <if test="param.inspector != null and param.inspector != ''">
+                AND inspector = #{param.inspector}
+            </if>
+            <if test="param.status != null and param.status != ''">
+                AND status = #{param.status}
+            </if>
+            <if test="param.result != null and param.result != ''">
+                AND result = #{param.result}
+            </if>
+            <if test="param.inspectionType != null and param.inspectionType != ''">
+                AND inspection_type = #{param.inspectionType}
+            </if>
+            <if test="param.urgent != null">
+                AND urgent = #{param.urgent}
+            </if>
+            <if test="param.workshopCode != null and param.workshopCode != ''">
+                AND workshop_code = #{param.workshopCode}
+            </if>
+            <if test="param.lineCode != null and param.lineCode != ''">
+                AND line_code = #{param.lineCode}
+            </if>
+            <if test="param.timeout != null and param.timeout">
+                AND TIMESTAMPDIFF(MINUTE, create_time, NOW()) > 60
+                AND status IN ('PENDING', 'INSPECTING')
+            </if>
+            <if test="param.timeout != null and !param.timeout">
+                AND (TIMESTAMPDIFF(MINUTE, create_time, NOW()) &lt;= 60
+                OR status NOT IN ('PENDING', 'INSPECTING'))
+            </if>
+
+            <!-- 时间范围查询 -->
+            <if test="param.createTimeStart != null">
+                AND create_time >= #{param.createTimeStart}
+            </if>
+            <if test="param.createTimeEnd != null">
+                AND create_time &lt;= #{param.createTimeEnd}
+            </if>
+            <if test="param.inspectionTimeStart != null">
+                AND inspection_date >= #{param.inspectionTimeStart}
+            </if>
+            <if test="param.inspectionTimeEnd != null">
+                AND inspection_date &lt;= #{param.inspectionTimeEnd}
+            </if>
+            <if test="param.completeTimeStart != null">
+                AND complete_time >= #{param.completeTimeStart}
+            </if>
+            <if test="param.completeTimeEnd != null">
+                AND complete_time &lt;= #{param.completeTimeEnd}
+            </if>
+            <if test="param.startDate != null">
+                AND DATE(inspection_date) >= #{param.startDate}
+            </if>
+            <if test="param.endDate != null">
+                AND DATE(inspection_date) &lt;= #{param.endDate}
+            </if>
+        </where>
+        <choose>
+            <when test="param.sortMode != null and param.sortMode == 'URGENT'">
+                ORDER BY urgent DESC, create_time DESC
+            </when>
+            <when test="param.sortMode != null and param.sortMode == 'TIMEOUT'">
+                ORDER BY
+                CASE WHEN status IN ('PENDING', 'INSPECTING') AND TIMESTAMPDIFF(MINUTE, create_time, NOW()) > 60
+                THEN 0 ELSE 1 END,
+                create_time ASC
+            </when>
+            <otherwise>
+                <if test="param.orderBy != null and param.orderBy != ''">
+                    ORDER BY ${param.orderBy}
+                    <if test="param.orderDirection != null and param.orderDirection != ''">
+                        ${param.orderDirection}
+                    </if>
+                </if>
+                <if test="param.orderBy == null or param.orderBy == ''">
+                    ORDER BY create_time DESC
+                </if>
+            </otherwise>
+        </choose>
+    </select>
+
+    <!-- 查询待检任务 -->
+    <select id="selectPendingTasks" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List" />
+        FROM mes_quality_task
+        WHERE status = 'PENDING'
+        <if test="inspector != null and inspector != ''">
+            AND (inspector IS NULL OR inspector = '' OR inspector = #{inspector})
+        </if>
+        ORDER BY
+        CASE WHEN urgent = true THEN 0 ELSE 1 END,
+        create_time ASC
+    </select>
+
+    <!-- 查询检验中的任务 -->
+    <select id="selectInspectingTasks" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List" />
+        FROM mes_quality_task
+        WHERE status = 'INSPECTING'
+        ORDER BY inspection_date DESC
+    </select>
+
+    <!-- 查询超时任务 -->
+    <select id="selectTimeoutTasks" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List" />
+        FROM mes_quality_task
+        WHERE status IN ('PENDING', 'INSPECTING')
+        AND TIMESTAMPDIFF(MINUTE, create_time, NOW()) > #{timeoutMinutes}
+        ORDER BY create_time ASC
+    </select>
+
+    <!-- 根据计划ID查询任务 -->
+    <select id="selectByPlanId" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List" />
+        FROM mes_quality_task
+        WHERE plan_id = #{planId}
+        ORDER BY create_time DESC
+    </select>
+
+    <!-- 统计待检任务数量 -->
+    <select id="countPendingTasksByPlan" resultType="java.lang.Long">
+        SELECT COUNT(1)
+        FROM mes_quality_task
+        WHERE plan_id = #{planId}
+          AND status = 'PENDING'
+    </select>
+
+    <!-- 获取今日统计 -->
+    <select id="getTodayStatistics" resultType="java.util.HashMap">
+        SELECT
+            COUNT(1) AS total_tasks,
+            SUM(CASE WHEN status = 'COMPLETED' THEN 1 ELSE 0 END) AS completed_tasks,
+            SUM(CASE WHEN status = 'PENDING' THEN 1 ELSE 0 END) AS pending_tasks,
+            SUM(CASE WHEN status = 'INSPECTING' THEN 1 ELSE 0 END) AS inspecting_tasks,
+            SUM(quantity_checked) AS total_checked,
+            SUM(quantity_qualified) AS total_qualified,
+            SUM(quantity_defective) AS total_defective,
+            CASE
+                WHEN SUM(quantity_checked) > 0
+                    THEN ROUND(SUM(quantity_qualified) * 100.0 / SUM(quantity_checked), 2)
+                ELSE 0
+                END AS pass_rate
+        FROM mes_quality_task
+        WHERE DATE(create_time) = CURDATE()
+    </select>
+
+    <!-- 获取基础统计 -->
+    <select id="getBasicStatistics" resultType="java.util.HashMap">
+        SELECT
+        COUNT(1) AS total_tasks,
+        SUM(CASE WHEN status = 'COMPLETED' THEN 1 ELSE 0 END) AS completed_tasks,
+        SUM(CASE WHEN status = 'PENDING' THEN 1 ELSE 0 END) AS pending_tasks,
+        SUM(CASE WHEN status = 'INSPECTING' THEN 1 ELSE 0 END) AS inspecting_tasks,
+        SUM(CASE WHEN status = 'CANCELLED' THEN 1 ELSE 0 END) AS cancelled_tasks,
+        SUM(quantity_checked) AS total_checked,
+        SUM(quantity_qualified) AS total_qualified,
+        SUM(quantity_defective) AS total_defective,
+        CASE
+        WHEN SUM(quantity_checked) > 0
+        THEN ROUND(SUM(quantity_qualified) * 100.0 / SUM(quantity_checked), 2)
+        ELSE 0
+        END AS pass_rate,
+        CASE
+        WHEN SUM(quantity_checked) > 0
+        THEN ROUND(SUM(quantity_defective) * 1000000.0 / SUM(quantity_checked), 2)
+        ELSE 0
+        END AS dpmo
+        FROM mes_quality_task
+        <where>
+            <if test="startDate != null">
+                AND DATE(create_time) >= #{startDate}
+            </if>
+            <if test="endDate != null">
+                AND DATE(create_time) &lt;= #{endDate}
+            </if>
+        </where>
+    </select>
+
+    <!-- 获取合格率趋势 -->
+    <select id="getPassRateTrend" resultType="java.util.HashMap">
+        SELECT
+        DATE(create_time) AS date,
+        COUNT(1) AS task_count,
+        SUM(quantity_checked) AS total_checked,
+        SUM(quantity_qualified) AS total_qualified,
+        SUM(quantity_defective) AS total_defective,
+        CASE
+        WHEN SUM(quantity_checked) > 0
+        THEN ROUND(SUM(quantity_qualified) * 100.0 / SUM(quantity_checked), 2)
+        ELSE 0
+        END AS pass_rate
+        FROM mes_quality_task
+        <where>
+            status = 'COMPLETED'
+            <if test="startDate != null">
+                AND DATE(create_time) >= #{startDate}
+            </if>
+            <if test="endDate != null">
+                AND DATE(create_time) &lt;= #{endDate}
+            </if>
+        </where>
+        GROUP BY DATE(create_time)
+        ORDER BY DATE(create_time)
+    </select>
+
+    <!-- 获取产品合格率排行 -->
+    <select id="getProductPassRateRank" resultType="java.util.HashMap">
+        SELECT
+        product_code,
+        product_name,
+        COUNT(1) AS task_count,
+        SUM(quantity_checked) AS total_checked,
+        SUM(quantity_qualified) AS total_qualified,
+        SUM(quantity_defective) AS total_defective,
+        CASE
+        WHEN SUM(quantity_checked) > 0
+        THEN ROUND(SUM(quantity_qualified) * 100.0 / SUM(quantity_checked), 2)
+        ELSE 0
+        END AS pass_rate
+        FROM mes_quality_task
+        <where>
+            status = 'COMPLETED'
+            <if test="startDate != null">
+                AND DATE(create_time) >= #{startDate}
+            </if>
+            <if test="endDate != null">
+                AND DATE(create_time) &lt;= #{endDate}
+            </if>
+        </where>
+        GROUP BY product_code, product_name
+        HAVING SUM(quantity_checked) > 0
+        ORDER BY pass_rate DESC
+        LIMIT 10
+    </select>
+
+    <!-- 获取检验员绩效 -->
+    <select id="getInspectorPerformance" resultType="java.util.HashMap">
+        SELECT
+        inspector,
+        COUNT(1) AS task_count,
+        SUM(quantity_checked) AS total_checked,
+        SUM(quantity_qualified) AS total_qualified,
+        SUM(quantity_defective) AS total_defective,
+        CASE
+        WHEN SUM(quantity_checked) > 0
+        THEN ROUND(SUM(quantity_qualified) * 100.0 / SUM(quantity_checked), 2)
+        ELSE 0
+        END AS pass_rate,
+        AVG(TIMESTAMPDIFF(MINUTE, create_time, complete_time)) AS avg_complete_time
+        FROM mes_quality_task
+        <where>
+            status = 'COMPLETED'
+            AND inspector IS NOT NULL
+            AND inspector != ''
+            <if test="startDate != null">
+                AND DATE(create_time) >= #{startDate}
+            </if>
+            <if test="endDate != null">
+                AND DATE(create_time) &lt;= #{endDate}
+            </if>
+        </where>
+        GROUP BY inspector
+        HAVING SUM(quantity_checked) > 0
+        ORDER BY pass_rate DESC
+    </select>
+    <!-- 分页查询检验任务 -->
+    <select id="selectPageList" resultType="com.mes.entity.QualityTask">
+        SELECT * FROM mes_quality_task
+        <where>
+            <if test="query.taskNo != null and query.taskNo != ''">
+                AND task_no LIKE CONCAT('%', #{query.taskNo}, '%')
+            </if>
+            <if test="query.productCode != null and query.productCode != ''">
+                AND product_code = #{query.productCode}
+            </if>
+            <if test="query.inspector != null and query.inspector != ''">
+                AND inspector = #{query.inspector}
+            </if>
+            <if test="query.status != null and query.status != ''">
+                AND status = #{query.status}
+            </if>
+            <!-- 其他查询条件 -->
+        </where>
+        ORDER BY create_time DESC
+    </select>
+
+    <!-- 批量更新任务状态 -->
+    <update id="updateBatchStatus">
+        UPDATE mes_quality_task
+        SET status = #{status},
+        inspector = #{inspector},
+        update_time = NOW()
+        <if test="inspectionDate != null">
+            , inspection_date = #{inspectionDate}
+        </if>
+        WHERE id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </update>
+    <!-- 基础列名 -->
+
+
+
+    <!-- 按状态统计 -->
+    <select id="countByStatus" resultType="map">
+        SELECT status, COUNT(*) as count
+        FROM quality_task
+        WHERE deleted = 0
+        <if test="query != null">
+            <if test="query.inspector != null and query.inspector != ''">
+                AND inspector = #{query.inspector}
+            </if>
+            <if test="query.productCode != null and query.productCode != ''">
+                AND product_code = #{query.productCode}
+            </if>
+            <if test="query.createTimeStart != null">
+                AND create_time >= #{query.createTimeStart}
+            </if>
+            <if test="query.createTimeEnd != null">
+                AND create_time &lt;= #{query.createTimeEnd}
+            </if>
+        </if>
+        GROUP BY status
+    </select>
+
+    <!-- 批量更新状态 -->
+
+
+    <!-- 批量逻辑删除 -->
+    <update id="deleteBatchByIds">
+        UPDATE quality_task
+        SET deleted = 1, update_time = NOW()
+        WHERE id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+        AND status = 'PENDING'
+        AND deleted = 0
+    </update>
+
+    <!-- 查询超时任务 -->
+
+
+    <!-- 获取今日统计 -->
+
+
+    <!-- 获取合格率趋势 -->
+<!--    <select id="getPassRateTrend" resultType="map">-->
+<!--        SELECT-->
+<!--        DATE(create_time) as date,-->
+<!--        COUNT(*) as task_count,-->
+<!--        SUM(quantity_checked) as checked_quantity,-->
+<!--        SUM(quantity_qualified) as qualified_quantity,-->
+<!--        CASE-->
+<!--        WHEN SUM(quantity_checked) > 0-->
+<!--        THEN ROUND(SUM(quantity_qualified) * 100.0 / SUM(quantity_checked), 2)-->
+<!--        ELSE 0-->
+<!--        END as pass_rate-->
+<!--        FROM quality_task-->
+<!--        WHERE deleted = 0-->
+<!--        AND status = 'COMPLETED'-->
+<!--        <if test="query != null">-->
+<!--            <if test="query.productCode != null and query.productCode != ''">-->
+<!--                AND product_code = #{query.productCode}-->
+<!--            </if>-->
+<!--            <if test="query.inspector != null and query.inspector != ''">-->
+<!--                AND inspector = #{query.inspector}-->
+<!--            </if>-->
+<!--            <if test="query.createTimeStart != null">-->
+<!--                AND create_time >= #{query.createTimeStart}-->
+<!--            </if>-->
+<!--            <if test="query.createTimeEnd != null">-->
+<!--                AND create_time &lt;= #{query.createTimeEnd}-->
+<!--            </if>-->
+<!--        </if>-->
+<!--        GROUP BY DATE(create_time)-->
+<!--        ORDER BY date-->
+<!--    </select>-->
+
+</mapper>
