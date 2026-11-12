@@ -88,6 +88,13 @@ management:
         include: health,info,metrics
 
 mes:
+  wms:
+    enabled: ${WMS_ENABLED:true}
+    base-url: ${WMS_BASE_URL:http://localhost:8088}
+    api-key: ${WMS_API_KEY:mes-wms-dev-key}
+    finished-goods-warehouse-code: ${WMS_FG_WAREHOUSE_CODE:FG01}
+    connect-timeout-ms: ${WMS_CONNECT_TIMEOUT_MS:3000}
+    read-timeout-ms: ${WMS_READ_TIMEOUT_MS:5000}
   modbus:
     enabled: ${MODBUS_ENABLED:false}
     simulator: ${MODBUS_SIMULATOR:false}

@@ -117,6 +117,13 @@ DeviceDataConsumer → 批量入库（INSERT IGNORE）
 
 `GET /api/trace/batch/{batchNo}` 返回 `BatchTraceVO`，串联质量任务、缺陷明细、工单、工序任务、领料明细与库存批次；无关联记录返回 404。
 
+### 7. WMS 库存集成
+
+- 领料单完成时，MES 在扣减本地库存后调用 WMS `POST /api/open/inventory/outbound`。
+- 工单首次完工时，MES 调用 WMS `POST /api/open/inventory/inbound`，把成品写入成品仓。
+
+WMS 是库存主账。请求带 `X-Integration-Key` 与幂等键 `requestId`；WMS 调用失败会回滚 MES 事务。配置见 `mes.wms.*`，接口与字段映射见 [WMS 集成文档](docs/WMS_INTEGRATION.md)。
+
 ## 快速开始
 
 ### 1. 启动基础设施

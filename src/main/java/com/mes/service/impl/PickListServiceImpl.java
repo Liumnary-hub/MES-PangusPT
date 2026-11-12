@@ -4,9 +4,12 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.mes.common.BusinessException;
 import com.mes.dto.*;
 
 import com.mes.entity.*;
+import com.mes.integration.wms.WmsInventoryClient;
+import com.mes.integration.wms.WmsOutboundRequest;
 import com.mes.mapper.*;
 import com.mes.service.InventoryService;
 import com.mes.service.PickListService;
@@ -36,6 +39,7 @@ public class PickListServiceImpl extends ServiceImpl<PickListMapper, PickList> i
     private final MaterialMapper materialMapper;
     private final WarehouseLocationMapper locationMapper;
     private final InventoryService inventoryService;
+    private final WmsInventoryClient wmsInventoryClient;
 
     @Override
     public TableDataInfo<PickListVO> selectPickListPage(PickListQueryDTO queryDTO) {
@@ -306,10 +310,56 @@ public class PickListServiceImpl extends ServiceImpl<PickListMapper, PickList> i
                         detail.getBatchNumber(),
                         detail.getPickedQuantity()
                 );
+                //WMS 主账：本地扣减后同步出库，失败则整个领料完成回滚
+                wmsInventoryClient.outbound(buildWmsOutboundRequest(pickList, detail));
             }
         }
 
         return pickListMapper.updateById(pickList) > 0;
+    }
+
+    private WmsOutboundRequest buildWmsOutboundRequest(PickList pickList, PickListDetail detail) {
+        BigDecimal picked = detail.getPickedQuantity();
+        if (picked == null || picked.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new BusinessException("领料明细 " + detail.getId() + " 实拣数量必须大于0");
+        }
+
+        int quantity;
+        try {
+            quantity = picked.intValueExact();
+        } catch (ArithmeticException e) {
+            throw new BusinessException("WMS出库数量必须为整数: " + picked);
+        }
+
+        Material material = materialMapper.selectById(detail.getMaterialId());
+        String materialCode = detail.getMaterialCode();
+        if (!StringUtils.hasText(materialCode) && material != null) {
+            materialCode = material.getMaterialCode();
+        }
+        if (!StringUtils.hasText(materialCode)) {
+            throw new BusinessException("领料明细 " + detail.getId() + " 缺少物料编码，无法同步WMS");
+        }
+
+        WarehouseLocation location = detail.getLocationId() == null
+                ? null : locationMapper.selectById(detail.getLocationId());
+        String warehouseCode = location != null ? location.getWarehouseCode() : null;
+        if (!StringUtils.hasText(warehouseCode)) {
+            throw new BusinessException("领料明细 " + detail.getId() + " 的库位未关联仓库编码，无法同步WMS");
+        }
+
+        WmsOutboundRequest request = new WmsOutboundRequest();
+        request.setRequestId("MES-PICKLIST-" + pickList.getId() + "-ITEM-" + detail.getId());
+        request.setCommodityCode(materialCode);
+        request.setCommodityName(material != null ? material.getMaterialName() : null);
+        request.setWarehouseCode(warehouseCode);
+        request.setWarehouseName(location.getWarehouseName());
+        request.setQuantity(quantity);
+        request.setBatchNo(detail.getBatchNumber());
+        request.setSourceType("MES_PICK_LIST");
+        request.setSourceNo(pickList.getPickListCode());
+        request.setSourceItemNo(String.valueOf(detail.getId()));
+        request.setDescription("MES领料单 " + pickList.getPickListCode() + " 明细 " + detail.getId());
+        return request;
     }
 
     @Override

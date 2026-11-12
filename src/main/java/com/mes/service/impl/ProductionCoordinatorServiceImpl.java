@@ -1,9 +1,12 @@
 package com.mes.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.mes.config.WmsProperties;
 import com.mes.dto.ProductionOrderDetail;
 import com.mes.entity.ProductionOrder;
 import com.mes.entity.ProductionTask;
+import com.mes.integration.wms.WmsInboundRequest;
+import com.mes.integration.wms.WmsInventoryClient;
 import com.mes.mapper.ProductionOrderMapper;
 import com.mes.mapper.ProductionTaskMapper;
 import com.mes.service.ProductionCoordinatorService;
@@ -14,6 +17,7 @@ import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -36,6 +40,12 @@ public class ProductionCoordinatorServiceImpl implements ProductionCoordinatorSe
 
     @Autowired
     private ProductionTaskMapper productionTaskMapper;
+
+    @Autowired
+    private WmsInventoryClient wmsInventoryClient;
+
+    @Autowired
+    private WmsProperties wmsProperties;
 
     @Override
     @Transactional
@@ -358,6 +368,8 @@ public class ProductionCoordinatorServiceImpl implements ProductionCoordinatorSe
 
             // 如果工单已经是完成或取消状态，不需要同步状态，但仍需要更新完成数量
             boolean shouldUpdate = false;
+            String oldStatus = order.getStatus();
+            String newStatus = oldStatus;
 
             // 获取工单的所有任务
             List<ProductionTask> tasks = productionTaskMapper.selectByOrderId(orderId);
@@ -379,19 +391,19 @@ public class ProductionCoordinatorServiceImpl implements ProductionCoordinatorSe
                 long pausedTasks = statusCount.getOrDefault("paused", 0L);
 
                 // 确定新的工单状态
-                String newStatus = determineOrderStatus(totalTasks, completedTasks, inProgressTasks, pausedTasks);
+                newStatus = determineOrderStatus(totalTasks, completedTasks, inProgressTasks, pausedTasks);
 
                 // 更新工单完成数量（无论状态是否改变）
                 updateOrderCompletedQuantity(order, tasks);
 
                 // 如果状态有变化，更新工单状态
-                if (!order.getStatus().equals(newStatus)) {
+                if (!oldStatus.equals(newStatus)) {
                     order.setStatus(newStatus);
                     // 设置实际开始和结束时间
                     updateOrderTimestamps(order, newStatus);
                     shouldUpdate = true;
                     log.info("工单状态同步完成, orderId: {}, 旧状态: {}, 新状态: {}",
-                            orderId, order.getStatus(), newStatus);
+                            orderId, oldStatus, newStatus);
                 } else {
                     // 即使状态没有变化，但完成数量可能变化了，也需要更新
                     shouldUpdate = true;
@@ -401,6 +413,9 @@ public class ProductionCoordinatorServiceImpl implements ProductionCoordinatorSe
             // 如果需要更新，保存工单
             if (shouldUpdate) {
                 productionOrderService.updateById(order);
+                if ("completed".equals(newStatus) && !"completed".equals(oldStatus)) {
+                    syncFinishedGoodsInbound(order);
+                }
                 log.debug("工单更新完成, orderId: {}, 完成数量: {}", orderId, order.getCompletedQuantity());
             }
 
@@ -457,6 +472,39 @@ public class ProductionCoordinatorServiceImpl implements ProductionCoordinatorSe
             log.error("获取工单进度失败, orderId: {}", orderId, e);
             throw new RuntimeException("获取工单进度失败", e);
         }
+    }
+
+    /**
+     * 工单首次完成时，把成品推入 WMS 成品仓。
+     * requestId 固定，重复调用由 WMS 幂等。
+     */
+    private void syncFinishedGoodsInbound(ProductionOrder order) {
+        String warehouseCode = wmsProperties.getFinishedGoodsWarehouseCode();
+        if (!StringUtils.hasText(warehouseCode)) {
+            log.warn("未配置成品仓编码，跳过完工入库, orderId: {}", order.getId());
+            return;
+        }
+        if (!StringUtils.hasText(order.getProductCode())) {
+            throw new RuntimeException("工单产品编码为空，无法完工入库");
+        }
+
+        Integer quantity = order.getCompletedQuantity();
+        if (quantity == null || quantity <= 0) {
+            log.warn("工单完成数量为0，跳过完工入库, orderId: {}", order.getId());
+            return;
+        }
+
+        WmsInboundRequest request = new WmsInboundRequest();
+        request.setRequestId("MES-ORDER-" + order.getId() + "-FINISHED-IN");
+        request.setCommodityCode(order.getProductCode());
+        request.setWarehouseCode(warehouseCode);
+        request.setQuantity(quantity);
+        request.setBatchNo(order.getOrderCode());
+        request.setSourceType("MES_PRODUCTION_ORDER");
+        request.setSourceNo(order.getOrderCode());
+        request.setSourceItemNo(String.valueOf(order.getId()));
+        request.setDescription("MES完工入库 " + order.getOrderCode());
+        wmsInventoryClient.inbound(request);
     }
 
     // ========== 私有方法 ==========
