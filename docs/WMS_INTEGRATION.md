@@ -46,12 +46,18 @@ mes:
 
 `WMS_ENABLED=false` 时领料完成只扣 MES 本地库存，不调用 WMS，便于单独跑 MES 测试。
 
+请求头与响应：
+
+- 请求头：`Content-Type: application/json`、`X-Integration-Key: ${mes.wms.api-key}`
+- 响应体：`{code, status, msg, data}`；`code == 200` 且 `status == true` 视为成功
+- 连接超时默认 3 秒，读取超时默认 5 秒
+
 ## 字段映射
 
 | MES | WMS |
 | --- | --- |
-| `pick_list_detail.material_code` | `commodity.code`，找不到再按 `commodityName` |
-| `warehouse_location.warehouse_code` | `warehouse.code`，找不到再按 `warehouseName` |
+| `pick_list_detail.material_code` | `commodity.code`；为空时从物料主数据补 `material_code`，仍为空则报错 |
+| `warehouse_location.warehouse_code` | `warehouse.code`；为空直接报错，`warehouseName` 仅用于展示 |
 | `pick_list_detail.picked_quantity` | `quantity`，必须为整数 |
 | `pick_list_detail.batch_number` | `batch_no` |
 | `pick_list.pick_list_code` | `source_no` |

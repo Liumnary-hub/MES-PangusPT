@@ -16,6 +16,8 @@ flowchart LR
     CONSUMER --> DB[(MySQL)]
     API[业务 / 追溯接口] --> DB
     API --> CACHE[(Redis)]
+    API -->|领料出库| WMS[(WMS 库存主账)]
+    API -->|完工入库| WMS
 ```
 
 ## 技术栈
@@ -29,6 +31,7 @@ flowchart LR
 | 缓存 | Redis 7（Spring Cache） |
 | 消息队列 | RabbitMQ 3（设备数据异步入库） |
 | 工业协议 | Modbus TCP（j2mod，读取保持寄存器；内置从站模拟器） |
+| 外部集成 | WMS REST（领料出库、完工入库） |
 | 鉴权 | JWT（jjwt 0.11.5）+ RBAC |
 | 对象映射 | MapStruct、BeanUtils |
 | 接口文档 | Knife4j 4.5（jakarta）/ OpenAPI 3 |
@@ -45,7 +48,8 @@ flowchart LR
 | 工艺路线 / 工序 | 路线与工序维护、标准工时、OEE 计算 |
 | BOM / 物料 | BOM 明细、物料主数据、批量导入 |
 | 库存 | 库位库存、批次库存、锁定/解锁、调拨、调整、库存流水 |
-| 领料 | 创建、执行拣料（锁定库存）、完成出库（真实扣减）、取消释放 |
+| 领料 | 创建、执行拣料（锁定库存）、完成出库（真实扣减）、取消释放、WMS 出库 |
+| WMS 集成 | 领料出库、完工入库、幂等键、超时与事务回滚 |
 | 质量 | 检验计划/任务、缺陷代码/明细、合格率、Pareto、SPC |
 | 设备 | 设备台账、点检、保养、故障记录、状态日志 |
 | 设备数据 | REST 批量上报、RabbitMQ 异步入库、Modbus TCP 主动采集、实时/历史查询 |
@@ -119,10 +123,17 @@ DeviceDataConsumer → 批量入库（INSERT IGNORE）
 
 ### 7. WMS 库存集成
 
-- 领料单完成时，MES 在扣减本地库存后调用 WMS `POST /api/open/inventory/outbound`。
-- 工单首次完工时，MES 调用 WMS `POST /api/open/inventory/inbound`，把成品写入成品仓。
+- 领料单完成时，MES 在逐条扣减本地库存后调用 WMS `POST /api/open/inventory/outbound`。
+- 工单状态首次变为 `completed` 时，MES 调用 WMS `POST /api/open/inventory/inbound`，把成品写入配置的成品仓。
 
-WMS 是库存主账。请求带 `X-Integration-Key` 与幂等键 `requestId`；WMS 调用失败会回滚 MES 事务。配置见 `mes.wms.*`，接口与字段映射见 [WMS 集成文档](docs/WMS_INTEGRATION.md)。
+WMS 是库存主账，MES 本地库存是车间执行镜像。请求带 `X-Integration-Key`，并使用固定 `requestId` 支持幂等：
+
+| 方向 | 幂等键 |
+| --- | --- |
+| 领料出库 | `MES-PICKLIST-{pickListId}-ITEM-{detailId}` |
+| 完工入库 | `MES-ORDER-{orderId}-FINISHED-IN` |
+
+WMS 调用在 MES 事务内，失败抛业务异常并回滚本地库存 / 工单状态。出库要求实拣数量为整数、库位已配置 `warehouse_code`。`WMS_ENABLED=false` 时跳过 WMS 调用，只跑本地库存。配置见 `mes.wms.*`，字段映射与验证步骤见 [WMS 集成文档](docs/WMS_INTEGRATION.md)。
 
 ## 快速开始
 
@@ -179,6 +190,11 @@ curl -X POST http://localhost:8080/api/auth/login \
 | `RABBITMQ_HOST` / `RABBITMQ_PORT` | `localhost` / `5672` | RabbitMQ |
 | `RABBITMQ_USERNAME` / `RABBITMQ_PASSWORD` | `mes` / `mes123` | RabbitMQ 账号 |
 | `JWT_SECRET` | 内置开发密钥 | 生产环境必须替换 |
+| `WMS_ENABLED` | `true` | 是否调用 WMS |
+| `WMS_BASE_URL` | `http://localhost:8088` | WMS 地址 |
+| `WMS_API_KEY` | 内置开发密钥 | `X-Integration-Key` |
+| `WMS_FG_WAREHOUSE_CODE` | `FG01` | 完工入库的成品仓编码 |
+| `WMS_CONNECT_TIMEOUT_MS` / `WMS_READ_TIMEOUT_MS` | `3000` / `5000` | WMS 超时 |
 | `MODBUS_ENABLED` | `false` | 开启 Modbus 采集 |
 | `MODBUS_SIMULATOR` | `false` | 开启内置 Modbus 从站模拟器 |
 | `MODBUS_HOST` / `MODBUS_PORT` | `localhost` / `5020` | 从站地址 |
@@ -267,6 +283,7 @@ src/main/java/com/mes
 ├── service         # 业务接口与实现（含 BatchTraceService、DeviceDataPublisher）
 ├── mq              # RabbitMQ 消费者
 ├── modbus          # Modbus TCP 采集器与从站模拟器
+├── integration/wms # WMS 库存接口客户端与请求模型
 ├── mapper          # MyBatis-Plus / 注解 SQL
 ├── repository      # Spring Data JPA（用户、角色、登录日志）
 ├── entity          # 数据库实体
